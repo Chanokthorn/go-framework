@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  db:
+    platform: linux/x86_64
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: john
+      MYSQL_DATABASE: john
+      MYSQL_USER: john
+      MYSQL_PASSWORD: john
+    ports:
+      - "3307:3306"
