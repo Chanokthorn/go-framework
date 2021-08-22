@@ -5,5 +5,5 @@ type Repository interface {
 	GetAll() ([]DomainModel, error)
 	Insert(domain DomainModel) (id int, err error)
 	Update(domain DomainModel) error
-	Delete(id int) error
+	Delete(uuid string) error
 }

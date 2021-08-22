@@ -36,6 +36,6 @@ func (s *service) Update(domain std.DomainModel) error {
 	return s.repository.Update(rel)
 }
 
-func (s *service) Delete(id int) error {
-	panic("implement me")
+func (s *service) Delete(uuid string) error {
+	return s.repository.Delete(uuid)
 }

@@ -20,17 +20,22 @@ func main() {
 
 	itemService := item.NewService(itemRelRepository)
 
-	uuid := "726d6cf7-4118-487d-9e2b-a3d7b0dc7e8d"
-	john := "john"
-	newItem := item.Item{
-		UUID: &uuid,
-		Name: &john,
-	}
-
-	err = itemService.Update(&newItem)
+	err = itemService.Delete("585647342")
 	if err != nil {
 		panic(err)
 	}
+
+	//uuid := "726d6cf7-4118-487d-9e2b-a3d7b0dc7e8d"
+	//john := "john"
+	//newItem := item.Item{
+	//	UUID: &uuid,
+	//	Name: &john,
+	//}
+	//
+	//err = itemService.Update(&newItem)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	//result, err := itemService.GetByID(1)
 	//if err != nil {

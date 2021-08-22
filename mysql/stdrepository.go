@@ -68,7 +68,7 @@ func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 	txtSQL.WriteString("SELECT ")
 	txtSQL.WriteString(strings.Join(m.fields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
-	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ?")
+	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ?, AND IsDeleted = false")
 
 	item := reflect.New(m.t).Interface()
 
@@ -175,6 +175,25 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 
 }
 
-func (m *standardRepository) Delete(id int) error {
-	panic("implement me")
+func (m *standardRepository) Delete(uuid string) error {
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET IsDeleted = true, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
+	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = " + uuid)
+
+	res, err := m.db.Exec(txtSQL.String())
+	if err != nil {
+		return fmt.Errorf("unable to update: %v", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("unable to retrieve affected rows: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows affeccted")
+	}
+
+	return nil
 }

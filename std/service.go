@@ -6,5 +6,5 @@ type Service interface {
 	GetByUUID(uuid string) (DomainModel, error)
 	Create(domain DomainModel) (int, error)
 	Update(domain DomainModel) error
-	Delete(id int) error
+	Delete(uuid string) error
 }

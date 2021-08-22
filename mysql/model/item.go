@@ -11,6 +11,7 @@ type DBItem struct {
 	Name        *string `db:"name" fake:"{name}"`
 	CreatedBy   *string `db:"CreatedBy" fake:"{name}"`
 	UpdatedDate *string `db:"UpdatedDate"`
+	IsDeleted   *bool   `db:"IsDeleted"`
 }
 
 func (d *DBItem) Set(domain std.DomainModel) {
