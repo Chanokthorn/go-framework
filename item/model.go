@@ -6,6 +6,13 @@ type RelationalItem struct {
 	Name *string `db:"name" fake:"{name}"`
 }
 
+func NewRelationalItem(item *Item) *RelationalItem {
+	return &RelationalItem{
+		UUID: item.UUID,
+		Name: item.Name,
+	}
+}
+
 func (r *RelationalItem) Equal(model interface{}) bool {
 	other := model.(RelationalItem)
 	return *r.UUID == *other.UUID && *r.Name == *other.Name

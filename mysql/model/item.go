@@ -6,10 +6,11 @@ import (
 )
 
 type DBItem struct {
-	ID        *int    `db:"id" fake:"{int8}"`
-	UUID      *string `db:"uuid" fake:"{uuid}"`
-	Name      *string `db:"name" fake:"{name}"`
-	CreatedBy *string `db:"createdBy" fake:"{name}"`
+	ID          *int    `db:"id" fake:"{int8}" std:"tableName:item,idField:id,uuidField:uuid"`
+	UUID        *string `db:"uuid" fake:"{uuid}"`
+	Name        *string `db:"name" fake:"{name}"`
+	CreatedBy   *string `db:"CreatedBy" fake:"{name}"`
+	UpdatedDate *string `db:"UpdatedDate"`
 }
 
 func (d *DBItem) Set(domain std.DomainModel) {

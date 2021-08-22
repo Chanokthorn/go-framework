@@ -19,7 +19,7 @@ func (s *service) GetAll() ([]std.DomainModel, error) {
 }
 
 func (s *service) GetByID(id int) (std.DomainModel, error) {
-	return s.repository.Get(id)
+	return s.repository.GetByID(id)
 }
 
 func (s *service) GetByUUID(uuid string) (std.DomainModel, error) {
@@ -31,7 +31,9 @@ func (s *service) Create(domain std.DomainModel) (int, error) {
 }
 
 func (s *service) Update(domain std.DomainModel) error {
-	panic("implement me")
+	item := domain.(*Item)
+	rel := NewRelationalItem(item)
+	return s.repository.Update(rel)
 }
 
 func (s *service) Delete(id int) error {

@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"fmt"
 	"reflect-test/mysql/model"
 	"reflect-test/std"
 )
@@ -10,7 +11,11 @@ type itemRepository struct {
 	db *DB
 }
 
-func NewItemRepository(db *DB) *itemRepository {
-	stdRepository := newStandardRepository("item", model.DBItem{}, "id", db)
-	return &itemRepository{stdRepository, db}
+func NewItemRepository(db *DB) (*itemRepository, error) {
+	stdRepository, err := newStandardRepository(model.DBItem{}, db)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to generate std repository: %v`, err)
+	}
+
+	return &itemRepository{stdRepository, db}, nil
 }
