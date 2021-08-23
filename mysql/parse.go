@@ -22,6 +22,8 @@ func parseConfig(s string) (config StdConfig, err error) {
 			config.IDField = v
 		case "uuidField":
 			config.UUIDField = v
+		case "parentIDField":
+			config.ParentIDField = v
 		case "recursiveOnGetAll":
 			if v == "false" {
 				config.RecursiveOnGetAll = false

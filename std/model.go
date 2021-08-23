@@ -1,10 +1,19 @@
 package std
 
 type DomainModel interface {
-	Equal(model interface{}) bool
+	Domain()
 }
 
 type DBModel interface {
+	ToDomain() DomainModel
+}
+
+type DBRootModel interface {
+	DBModel
 	Set(domain DomainModel)
-	ToModel() DomainModel
+}
+
+type DBAggregateModel interface {
+	DBModel
+	Set(rootID int, domain DomainModel)
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"reflect-test/item"
 	"reflect-test/mysql"
 )
@@ -44,12 +45,12 @@ func main() {
 	//
 	//spew.Dump(result)
 	//
-	//result2, err := itemService.GetAll()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//spew.Dump(result2)
+	result2, err := itemService.GetAll()
+	if err != nil {
+		panic(err)
+	}
+
+	spew.Dump(result2)
 
 	//var newItem item.RelationalItem
 	//err = gofakeit.Struct(&newItem)

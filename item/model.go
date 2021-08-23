@@ -1,9 +1,10 @@
 package item
 
 type RelationalItem struct {
-	ID   *int    `db:"id" fake:"{int8}"`
-	UUID *string `db:"string" fake:"{uuid}"`
-	Name *string `db:"name" fake:"{name}"`
+	ID        *int
+	UUID      *string
+	Name      *string
+	Locations []Location
 }
 
 func NewRelationalItem(item *Item) *RelationalItem {
@@ -13,17 +14,19 @@ func NewRelationalItem(item *Item) *RelationalItem {
 	}
 }
 
-func (r *RelationalItem) Equal(model interface{}) bool {
-	other := model.(RelationalItem)
-	return *r.UUID == *other.UUID && *r.Name == *other.Name
-}
+func (r *RelationalItem) Domain() {}
 
 type Item struct {
-	UUID *string `db:"string"`
-	Name *string `db:"name"`
+	UUID      *string
+	Name      *string
+	Locations []Location
 }
 
-func (i *Item) Equal(model interface{}) bool {
-	other := model.(Item)
-	return *i.UUID == *other.UUID && *i.Name == *other.Name
+func (i *Item) Domain() {}
+
+type Location struct {
+	Country    *string
+	PostalCode *string
 }
+
+func (l *Location) Domain() {}

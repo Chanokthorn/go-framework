@@ -13,6 +13,7 @@ type StdConfig struct {
 	TableName         string
 	IDField           string
 	UUIDField         string
+	ParentIDField     string
 	RecursiveOnGetAll bool
 }
 
@@ -62,6 +63,16 @@ func newStandardRepository(obj interface{}, db *DB) (std.Repository, error) {
 	return &standardRepository{t: t, config: config, db: db, fields: getFields(t)}, nil
 }
 
+func isAggregate(field interface{}) bool {
+	inter := reflect.TypeOf((*std.DBAggregateModel)(nil)).Elem()
+
+	if reflect.TypeOf(field).Implements(inter) {
+		return true
+	}
+
+	return false
+}
+
 func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 	var txtSQL strings.Builder
 
@@ -77,9 +88,9 @@ func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 		return nil, fmt.Errorf(`unable to get: %v`, err)
 	}
 
-	result := item.(std.DBModel)
+	result := item.(std.DBRootModel)
 
-	return result.ToModel(), nil
+	return result.ToDomain(), nil
 }
 
 func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
@@ -101,9 +112,9 @@ func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
 	result := []std.DomainModel{}
 
 	for i := 0; i < s.Len(); i++ {
-		result = append(result, s.Index(i).Interface().(model.DBItem).ToModel())
+		result = append(result, s.Index(i).Interface().(model.DBItem).ToDomain())
 		john := s.Index(i).Interface().(model.DBItem)
-		spew.Dump(john.ToModel())
+		spew.Dump(john.ToDomain())
 	}
 
 	return result, nil
@@ -120,7 +131,7 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 	name := txtSQL.String()
 	println(name)
 
-	dbObject := reflect.New(m.t).Interface().(std.DBModel)
+	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
 	dbObject.Set(domain)
 
@@ -136,8 +147,9 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 
 	return int(id64), nil
 }
+
 func (m *standardRepository) Update(domain std.DomainModel) error {
-	dbObject := reflect.New(m.t).Interface().(std.DBModel)
+	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
 	dbObject.Set(domain)
 
