@@ -1,10 +1,13 @@
 package item
 
+import "reflect-test/std"
+
 type RelationalItem struct {
-	ID        *int
-	UUID      *string
-	Name      *string
-	Locations []Location
+	std.DomainModel
+	ID        *int       `fake:"skip"`
+	UUID      *string    `fake:"{uuid}"`
+	Name      *string    `fake:"{name}"`
+	Locations []Location `fakesize:"3"`
 }
 
 func NewRelationalItem(item *Item) *RelationalItem {
@@ -14,19 +17,15 @@ func NewRelationalItem(item *Item) *RelationalItem {
 	}
 }
 
-func (r *RelationalItem) Domain() {}
-
 type Item struct {
+	std.DomainModel
 	UUID      *string
 	Name      *string
 	Locations []Location
 }
 
-func (i *Item) Domain() {}
-
 type Location struct {
-	Country    *string
-	PostalCode *string
+	std.DomainModel
+	Country    *string `fake:"{country}"`
+	PostalCode *string `fake:"{randomstring:[13212,13142,14283,12058,19640]}"`
 }
-
-func (l *Location) Domain() {}

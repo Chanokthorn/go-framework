@@ -6,6 +6,7 @@ import (
 )
 
 type DBItem struct {
+	std.DBRootModel
 	Config      struct{} `std:"tableName:item,idField:id,uuidField:uuid"`
 	ID          *int     `db:"id"`
 	UUID        *string  `db:"uuid"`
@@ -17,22 +18,41 @@ type DBItem struct {
 }
 
 func (d DBItem) ToDomain() std.DomainModel {
+	locations := []item.Location{}
+
+	for _, l := range d.Locations {
+		location := l.ToDomain().(*item.Location)
+		locations = append(locations, *location)
+	}
+
 	return &item.RelationalItem{
-		ID:   d.ID,
-		UUID: d.UUID,
-		Name: d.Name,
+		ID:        d.ID,
+		UUID:      d.UUID,
+		Name:      d.Name,
+		Locations: locations,
 	}
 }
 
 func (d *DBItem) Set(domain std.DomainModel) {
 	n, _ := domain.(*item.RelationalItem)
+
+	locations := []DBLocation{}
+
+	for _, l := range n.Locations {
+		var lDB DBLocation
+		lDB.Set(l)
+
+		locations = append(locations, lDB)
+	}
+
 	d.ID = n.ID
 	d.UUID = n.UUID
 	d.Name = n.Name
+	d.Locations = locations
 }
 
 type DBLocation struct {
-	Config      struct{} `std:"tableName:locations,idField:id,parentIDField:itemID"`
+	Config      struct{} `std:"tableName:item_location,idField:id,parentIDField:itemID"`
 	ID          *int     `db:"id"`
 	ItemID      *int     `db:"itemID"`
 	Country     *string  `db:"country"`
@@ -49,8 +69,8 @@ func (d *DBLocation) ToDomain() std.DomainModel {
 	}
 }
 
-func (d *DBLocation) Set(rootID int, domain std.DomainModel) {
-	n, _ := domain.(*item.Location)
+func (d *DBLocation) Set(domain std.DomainModel) {
+	n, _ := domain.(item.Location)
 	d.Country = n.Country
 	d.PostalCode = n.PostalCode
 }

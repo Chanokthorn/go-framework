@@ -73,24 +73,91 @@ func isAggregate(field interface{}) bool {
 	return false
 }
 
+func implementsDBAggregateModel(t reflect.Type) bool {
+	inter := reflect.TypeOf((*std.DBAggregateModel)(nil)).Elem()
+
+	return reflect.PtrTo(t.Elem()).Implements(inter)
+}
+
+func implementsDBAggregateModelSlice(t reflect.Type) bool {
+	if t.Kind() == reflect.Slice {
+		return implementsDBAggregateModel(t)
+	}
+
+	return false
+}
+
+func (m *standardRepository) GetAggregates(v reflect.Value, rootID int) error {
+	t := v.Type().Elem()
+	spew.Dump(t)
+
+	config, err := getConfig(t)
+	if err != nil {
+		return fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	fields := getFields(t)
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(fields, ", "))
+	txtSQL.WriteString(" FROM " + config.TableName)
+	txtSQL.WriteString(" WHERE " + config.ParentIDField + " = ? AND IsDeleted = false")
+
+	s2 := txtSQL.String()
+
+	println(s2)
+
+	items := reflect.New(reflect.SliceOf(t)).Interface()
+
+	err = m.db.Select(items, txtSQL.String(), rootID)
+	if err != nil {
+		return fmt.Errorf(`unable to get all: %v`, err)
+	}
+
+	s := reflect.Indirect(reflect.ValueOf(items))
+
+	for i := 0; i < s.Len(); i++ {
+		v.Set(reflect.Append(v, s.Index(i)))
+	}
+
+	return nil
+}
+
 func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
 	txtSQL.WriteString(strings.Join(m.fields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
-	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ?, AND IsDeleted = false")
+	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
 
 	item := reflect.New(m.t).Interface()
+
+	s := txtSQL.String()
+	println(s)
 
 	err := m.db.Get(item, txtSQL.String(), id)
 	if err != nil {
 		return nil, fmt.Errorf(`unable to get: %v`, err)
 	}
 
-	result := item.(std.DBRootModel)
+	rootModel := item.(std.DBModel)
 
-	return result.ToDomain(), nil
+	v := reflect.ValueOf(rootModel)
+	t := reflect.TypeOf(rootModel).Elem()
+
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			err = m.GetAggregates(v.Elem().Field(i), id)
+			if err != nil {
+				return nil, fmt.Errorf(`unable to get aggregates: %v`, err)
+			}
+		}
+	}
+
+	return v.Interface().(std.DBModel).ToDomain(), nil
 }
 
 func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
@@ -120,6 +187,98 @@ func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
 	return result, nil
 }
 
+func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, error) {
+	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
+
+	dbObject.Set(domain)
+
+	v := reflect.ValueOf(dbObject)
+	t := reflect.TypeOf(dbObject).Elem()
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", "))
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE IsDeleted = false")
+
+	for i := 0; i < t.NumField(); i++ {
+		if field := t.Field(i).Tag.Get("db"); field != "" {
+			if !v.Elem().Field(i).IsNil() {
+				txtSQL.WriteString(" AND " + field + " = :" + field)
+			}
+		}
+	}
+
+	rows, err := m.db.NamedQuery(txtSQL.String(), dbObject)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to get: %v`, err)
+	}
+
+	result := []std.DomainModel{}
+
+	for rows.Next() {
+		doc := reflect.New(m.t).Interface()
+
+		err := rows.StructScan(doc)
+		if err != nil {
+			return nil, fmt.Errorf(`unable to scan struct: %v`, err)
+		}
+
+		result = append(result, doc.(std.DBModel).ToDomain())
+	}
+
+	return result, nil
+}
+
+func (m *standardRepository) InsertAggregates(v reflect.Value, rootID int) error {
+	t := v.Type().Elem()
+	spew.Dump(t)
+
+	config, err := getConfig(t)
+	if err != nil {
+		return fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	fields := getFields(t)
+
+	spew.Dump(v)
+
+	for i := 0; i < v.Len(); i++ {
+		spew.Dump(v.Index(i).Interface().(model.DBLocation))
+
+		v.Index(i).FieldByName("ItemID").Set(reflect.ValueOf(&rootID))
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("INSERT INTO ")
+	txtSQL.WriteString(config.TableName)
+	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ")")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ")")
+
+	res, err := m.db.NamedExec(txtSQL.String(), v.Interface())
+	if err != nil {
+		return fmt.Errorf(`unable to insert: %v`, err)
+	}
+
+	id64, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf(`unable to inserted id: %v`, err)
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			err = m.InsertAggregates(v.Elem().Field(i), int(id64))
+			if err != nil {
+				return fmt.Errorf(`unable to insert aggregates: %v`, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) {
 	var txtSQL strings.Builder
 
@@ -127,9 +286,6 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 	txtSQL.WriteString(m.config.TableName)
 	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ")")
 	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ")")
-
-	name := txtSQL.String()
-	println(name)
 
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
@@ -143,6 +299,18 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 	id64, err := res.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf(`unable to get inserted id: %v`, err)
+	}
+
+	v := reflect.ValueOf(dbObject)
+	t := reflect.TypeOf(dbObject).Elem()
+
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			err = m.InsertAggregates(v.Elem().Field(i), int(id64))
+			if err != nil {
+				return 0, fmt.Errorf(`unable to insert aggregates: %v`, err)
+			}
+		}
 	}
 
 	return int(id64), nil
@@ -169,9 +337,6 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 	}
 
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = :" + m.config.UUIDField)
-
-	str := txtSQL.String()
-	println(str)
 
 	res, err := m.db.NamedExec(txtSQL.String(), dbObject)
 	if err != nil {

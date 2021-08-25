@@ -15,5 +15,5 @@ type DBRootModel interface {
 
 type DBAggregateModel interface {
 	DBModel
-	Set(rootID int, domain DomainModel)
+	Set(domain DomainModel)
 }

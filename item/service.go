@@ -26,6 +26,10 @@ func (s *service) GetByUUID(uuid string) (std.DomainModel, error) {
 	panic("implement me")
 }
 
+func (s *service) Search(domain std.DomainModel) ([]std.DomainModel, error) {
+	return s.repository.Search(domain)
+}
+
 func (s *service) Create(domain std.DomainModel) (int, error) {
 	return s.repository.Insert(domain)
 }
