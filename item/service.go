@@ -35,9 +35,7 @@ func (s *service) Create(domain std.DomainModel) (int, error) {
 }
 
 func (s *service) Update(domain std.DomainModel) error {
-	item := domain.(*Item)
-	rel := NewRelationalItem(item)
-	return s.repository.Update(rel)
+	return s.repository.Update(domain)
 }
 
 func (s *service) Delete(uuid string) error {

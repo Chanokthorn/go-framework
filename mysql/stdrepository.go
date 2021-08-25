@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"reflect-test/mysql/model"
 	"reflect-test/std"
+	"strconv"
 	"strings"
 )
 
@@ -231,6 +232,7 @@ func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, 
 	return result, nil
 }
 
+// InsertAggregates does not support recursive insert in this implementation
 func (m *standardRepository) InsertAggregates(v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 	spew.Dump(t)
@@ -241,8 +243,6 @@ func (m *standardRepository) InsertAggregates(v reflect.Value, rootID int) error
 	}
 
 	fields := getFields(t)
-
-	spew.Dump(v)
 
 	for i := 0; i < v.Len(); i++ {
 		spew.Dump(v.Index(i).Interface().(model.DBLocation))
@@ -262,19 +262,12 @@ func (m *standardRepository) InsertAggregates(v reflect.Value, rootID int) error
 		return fmt.Errorf(`unable to insert: %v`, err)
 	}
 
-	id64, err := res.LastInsertId()
+	_, err = res.LastInsertId()
 	if err != nil {
 		return fmt.Errorf(`unable to inserted id: %v`, err)
 	}
 
-	for i := 0; i < t.NumField(); i++ {
-		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.InsertAggregates(v.Elem().Field(i), int(id64))
-			if err != nil {
-				return fmt.Errorf(`unable to insert aggregates: %v`, err)
-			}
-		}
-	}
+	// TODO: recursive implementation
 
 	return nil
 }
@@ -316,6 +309,57 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 	return int(id64), nil
 }
 
+// DeleteAggregates does not support recursive in this implementation
+func (m *standardRepository) DeleteAggregates(t reflect.Type, rootID int) error {
+	config, err := getConfig(t)
+	if err != nil {
+		return fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("UPDATE " + config.TableName + " SET IsDeleted = true, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
+	txtSQL.WriteString(" WHERE " + config.ParentIDField + " = " + strconv.Itoa(rootID))
+
+	_, err = m.db.Exec(txtSQL.String())
+	if err != nil {
+		return fmt.Errorf("unable to update: %v", err)
+	}
+
+	return nil
+}
+
+func (m *standardRepository) GetID(v reflect.Value) (int, error) {
+	t := v.Type()
+
+	spew.Dump(t)
+
+	config, err := getConfig(t)
+	if err != nil {
+		return 0, fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	uuid := v.FieldByName("UUID").Elem().Interface().(string)
+	if uuid == "" {
+		return 0, fmt.Errorf(`uuid is emtpy`)
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT " + config.IDField + " AS id")
+	txtSQL.WriteString(" FROM " + config.TableName)
+	txtSQL.WriteString(" WHERE " + config.UUIDField + " = ? AND IsDeleted = false")
+
+	var id int
+
+	err = m.db.Get(&id, txtSQL.String(), uuid)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
+}
+
 func (m *standardRepository) Update(domain std.DomainModel) error {
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
@@ -338,14 +382,25 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = :" + m.config.UUIDField)
 
-	res, err := m.db.NamedExec(txtSQL.String(), dbObject)
+	_, err := m.db.NamedExec(txtSQL.String(), dbObject)
 	if err != nil {
 		return fmt.Errorf("unable to update: %v", err)
 	}
 
-	_, err = res.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("unable to retrieve updated id: %v", err)
+	rootID, err := m.GetID(v.Elem())
+
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			err = m.DeleteAggregates(t.Field(i).Type.Elem(), rootID)
+			if err != nil {
+				return fmt.Errorf(`unable to delete aggregates: %v`, err)
+			}
+
+			err = m.InsertAggregates(v.Elem().Field(i), rootID)
+			if err != nil {
+				return fmt.Errorf(`unable to insert aggregates: %v`, err)
+			}
+		}
 	}
 
 	return nil
