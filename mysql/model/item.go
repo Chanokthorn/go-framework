@@ -7,14 +7,15 @@ import (
 
 type DBItem struct {
 	std.DBRootModel
-	Config      struct{} `std:"tableName:item,idField:id,uuidField:uuid"`
-	ID          *int     `db:"id"`
-	UUID        *string  `db:"uuid"`
-	Name        *string  `db:"name"`
-	Locations   []DBLocation
-	CreatedBy   *string `db:"CreatedBy"`
-	UpdatedDate *string `db:"UpdatedDate"`
-	IsDeleted   *bool   `db:"IsDeleted"`
+	std.DBModelCommon
+	Config    struct{} `std:"tableName:item,idField:id,uuidField:uuid"`
+	ID        *int     `db:"id"`
+	UUID      *string  `db:"uuid"`
+	Name      *string  `db:"name"`
+	Locations []DBLocation
+	//CreatedBy   *string `db:"CreatedBy"`
+	//UpdatedDate *string `db:"UpdatedDate"`
+	//IsDeleted   *bool   `db:"IsDeleted"`
 }
 
 func (d DBItem) ToDomain() std.DomainModel {
@@ -52,14 +53,12 @@ func (d *DBItem) Set(domain std.DomainModel) {
 }
 
 type DBLocation struct {
-	Config      struct{} `std:"tableName:item_location,idField:id,parentIDField:itemID"`
-	ID          *int     `db:"id"`
-	ItemID      *int     `db:"itemID"`
-	Country     *string  `db:"country"`
-	PostalCode  *string  `db:"postalCode"`
-	CreatedBy   *string  `db:"CreatedBy"`
-	UpdatedDate *string  `db:"UpdatedDate"`
-	IsDeleted   *bool    `db:"IsDeleted"`
+	std.DBModelCommon
+	Config     struct{} `std:"tableName:item_location,idField:id,parentIDField:itemID"`
+	ID         *int     `db:"id"`
+	ItemID     *int     `db:"itemID"`
+	Country    *string  `db:"country"`
+	PostalCode *string  `db:"postalCode"`
 }
 
 func (d *DBLocation) ToDomain() std.DomainModel {

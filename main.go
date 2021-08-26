@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/davecgh/go-spew/spew"
 	"reflect-test/item"
 	"reflect-test/mysql"
 )
@@ -40,31 +40,32 @@ func main() {
 	//	panic(err)
 	//}
 
-	////// UPDATE //////
-	uuid := "726d6cf7-4118-487d-9e2b-a3d7b0dc7e8d"
-	john := "john2"
-
-	var newItem item.RelationalItem
-	err = gofakeit.Struct(&newItem)
-	if err != nil {
-		panic(err)
-	}
-
-	newItem.UUID = &uuid
-	newItem.Name = &john
-
-	err = itemService.Update(&newItem)
-	if err != nil {
-		panic(err)
-	}
-
-	//result, err := itemService.GetByID(120)
+	//////// UPDATE //////
+	//uuid := "726d6cf7-4118-487d-9e2b-a3d7b0dc7e8d"
+	//john := "john2"
+	//
+	//var newItem item.RelationalItem
+	//err = gofakeit.Struct(&newItem)
 	//if err != nil {
 	//	panic(err)
 	//}
 	//
-	//spew.Dump(result)
+	//newItem.UUID = &uuid
+	//newItem.Name = &john
 	//
+	//err = itemService.Update(&newItem)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	///// GET BY ID ///////
+	result, err := itemService.GetByID(150)
+	if err != nil {
+		panic(err)
+	}
+
+	spew.Dump(result)
+
 	//result2, err := itemService.GetAll()
 	//if err != nil {
 	//	panic(err)
@@ -72,6 +73,7 @@ func main() {
 	//
 	//spew.Dump(result2)
 
+	//////// CREATE /////
 	//var newItem item.RelationalItem
 	//err = gofakeit.Struct(&newItem)
 	//if err != nil {

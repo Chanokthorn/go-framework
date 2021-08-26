@@ -8,6 +8,12 @@ import (
 	"reflect-test/std"
 	"strconv"
 	"strings"
+	"time"
+)
+
+const (
+	commonSelect      = `, CreatedBy, UpdatedDate`
+	commonInsertField = `, CreatedBy`
 )
 
 type StdConfig struct {
@@ -46,11 +52,77 @@ func getFields(t reflect.Type) []string {
 	return fields
 }
 
+func setCreateFields(name string, v reflect.Value) error {
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf(`value must be pointer`)
+	}
+
+	v.Elem().FieldByName("CreatedBy").Set(reflect.ValueOf(&name))
+
+	return nil
+}
+
+func setCreateFieldsSlice(name string, v reflect.Value) error {
+	if v.Kind() != reflect.Slice {
+		return fmt.Errorf(`value must be slice`)
+	}
+
+	for i := 0; i < v.Len(); i++ {
+		v.Index(i).FieldByName("CreatedBy").Set(reflect.ValueOf(&name))
+	}
+
+	return nil
+}
+
+func setUpdateFields(date time.Time, v reflect.Value) error {
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf(`value must be pointer`)
+	}
+
+	v.Elem().FieldByName("UpdatedDate").Set(reflect.ValueOf(&date))
+
+	return nil
+}
+
 type standardRepository struct {
 	t      reflect.Type
 	config StdConfig
 	db     *DB
 	fields []string
+}
+
+func validateDBModel(model interface{}) error {
+	t := reflect.TypeOf(model).Elem()
+
+	if _, err := getConfig(t); err != nil {
+		return fmt.Errorf(`invalid model config: %v`, err)
+	}
+
+	common := reflect.TypeOf(std.DBModelCommon{})
+
+	foundCommon := false
+	for i := 0; i < t.NumField(); i++ {
+		if t.Field(i).Type == common {
+			foundCommon = true
+		}
+	}
+
+	if !foundCommon {
+		return fmt.Errorf(`model must contain std.DBModelCommon`)
+	}
+
+	return nil
+}
+
+func getFieldAndConfig(t reflect.Type) ([]string, StdConfig, error) {
+	config, err := getConfig(t)
+	if err != nil {
+		return nil, StdConfig{}, fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	fields := getFields(t)
+
+	return fields, config, nil
 }
 
 func newStandardRepository(obj interface{}, db *DB) (std.Repository, error) {
@@ -90,25 +162,18 @@ func implementsDBAggregateModelSlice(t reflect.Type) bool {
 
 func (m *standardRepository) GetAggregates(v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
-	spew.Dump(t)
 
-	config, err := getConfig(t)
+	fields, config, err := getFieldAndConfig(t)
 	if err != nil {
-		return fmt.Errorf(`unable to get type config: %v`, err)
+		return fmt.Errorf(`unable to get config and field: %v`, err)
 	}
-
-	fields := getFields(t)
 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(fields, ", "))
+	txtSQL.WriteString(strings.Join(fields, ", ") + ", CreatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + config.TableName)
 	txtSQL.WriteString(" WHERE " + config.ParentIDField + " = ? AND IsDeleted = false")
-
-	s2 := txtSQL.String()
-
-	println(s2)
 
 	items := reflect.New(reflect.SliceOf(t)).Interface()
 
@@ -130,7 +195,7 @@ func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", "))
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
 
@@ -158,6 +223,8 @@ func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 		}
 	}
 
+	spew.Dump(v.Interface().(std.DBModel))
+
 	return v.Interface().(std.DBModel).ToDomain(), nil
 }
 
@@ -165,7 +232,7 @@ func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", "))
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
@@ -181,8 +248,6 @@ func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
 
 	for i := 0; i < s.Len(); i++ {
 		result = append(result, s.Index(i).Interface().(model.DBItem).ToDomain())
-		john := s.Index(i).Interface().(model.DBItem)
-		spew.Dump(john.ToDomain())
 	}
 
 	return result, nil
@@ -199,7 +264,7 @@ func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", "))
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE IsDeleted = false")
 
@@ -233,29 +298,29 @@ func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, 
 }
 
 // InsertAggregates does not support recursive insert in this implementation
-func (m *standardRepository) InsertAggregates(v reflect.Value, rootID int) error {
+func (m *standardRepository) InsertAggregates(name string, v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
-	spew.Dump(t)
 
-	config, err := getConfig(t)
+	fields, config, err := getFieldAndConfig(t)
 	if err != nil {
-		return fmt.Errorf(`unable to get type config: %v`, err)
+		return fmt.Errorf(`unable to get config and field: %v`, err)
 	}
 
-	fields := getFields(t)
-
 	for i := 0; i < v.Len(); i++ {
-		spew.Dump(v.Index(i).Interface().(model.DBLocation))
-
 		v.Index(i).FieldByName("ItemID").Set(reflect.ValueOf(&rootID))
+	}
+
+	err = setCreateFieldsSlice("system", v)
+	if err != nil {
+		return fmt.Errorf(`unable to set create fields: %v`, err)
 	}
 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("INSERT INTO ")
 	txtSQL.WriteString(config.TableName)
-	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ")")
-	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ")")
+	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ", CreatedBy)")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ", :CreatedBy)")
 
 	res, err := m.db.NamedExec(txtSQL.String(), v.Interface())
 	if err != nil {
@@ -277,12 +342,17 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 
 	txtSQL.WriteString("INSERT INTO ")
 	txtSQL.WriteString(m.config.TableName)
-	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ")")
-	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ")")
+	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ", CreatedBy)")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ", :CreatedBy)")
 
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
 	dbObject.Set(domain)
+
+	err = setCreateFields("system", reflect.ValueOf(dbObject))
+	if err != nil {
+		return 0, fmt.Errorf(`unable to set creaet fields: %v`, err)
+	}
 
 	res, err := m.db.NamedExec(txtSQL.String(), dbObject)
 	if err != nil {
@@ -299,7 +369,7 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.InsertAggregates(v.Elem().Field(i), int(id64))
+			err = m.InsertAggregates("system", v.Elem().Field(i), int(id64))
 			if err != nil {
 				return 0, fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -311,9 +381,9 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 
 // DeleteAggregates does not support recursive in this implementation
 func (m *standardRepository) DeleteAggregates(t reflect.Type, rootID int) error {
-	config, err := getConfig(t)
+	_, config, err := getFieldAndConfig(t)
 	if err != nil {
-		return fmt.Errorf(`unable to get type config: %v`, err)
+		return fmt.Errorf(`unable to get config and field: %v`, err)
 	}
 
 	var txtSQL strings.Builder
@@ -331,8 +401,6 @@ func (m *standardRepository) DeleteAggregates(t reflect.Type, rootID int) error 
 
 func (m *standardRepository) GetID(v reflect.Value) (int, error) {
 	t := v.Type()
-
-	spew.Dump(t)
 
 	config, err := getConfig(t)
 	if err != nil {
@@ -396,7 +464,7 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
 
-			err = m.InsertAggregates(v.Elem().Field(i), rootID)
+			err = m.InsertAggregates("system", v.Elem().Field(i), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
