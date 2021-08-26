@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"reflect"
-	"reflect-test/mysql/model"
-	"reflect-test/std"
+	"reflect-test/v1/internal/mysql/model"
+	"reflect-test/v1/internal/std"
+	"reflect-test/v1/internal/std/mysql"
 	"strconv"
 	"strings"
 )
@@ -51,6 +52,7 @@ func setCreateFields(name string, v reflect.Value) error {
 		return fmt.Errorf(`value must be pointer`)
 	}
 
+	v.Elem().FieldByName("")
 	v.Elem().FieldByName("CreatedBy").Set(reflect.ValueOf(&name))
 
 	return nil
@@ -90,7 +92,7 @@ func setUpdateFieldsSlice(name string, v reflect.Value) error {
 	return nil
 }
 
-type standardRepository struct {
+type DomainRepository struct {
 	t      reflect.Type
 	config StdConfig
 	db     *DB
@@ -104,7 +106,7 @@ func validateDBModel(model interface{}) error {
 		return fmt.Errorf(`invalid model config: %v`, err)
 	}
 
-	common := reflect.TypeOf(std.DBModelCommon{})
+	common := reflect.TypeOf(mysql.DBModelCommon{})
 
 	foundCommon := false
 	for i := 0; i < t.NumField(); i++ {
@@ -131,7 +133,7 @@ func getFieldAndConfig(t reflect.Type) ([]string, StdConfig, error) {
 	return fields, config, nil
 }
 
-func newStandardRepository(obj interface{}, db *DB) (std.Repository, error) {
+func newStandardRepository(obj interface{}, db *DB) (mysql.DomainRepository, error) {
 	t := reflect.TypeOf(obj)
 
 	config, err := getConfig(t)
@@ -139,7 +141,7 @@ func newStandardRepository(obj interface{}, db *DB) (std.Repository, error) {
 		return nil, fmt.Errorf(`unable to get std config: %v`, err)
 	}
 
-	return &standardRepository{t: t, config: config, db: db, fields: getFields(t)}, nil
+	return &DomainRepository{t: t, config: config, db: db, fields: getFields(t)}, nil
 }
 
 func isAggregate(field interface{}) bool {
@@ -166,7 +168,7 @@ func implementsDBAggregateModelSlice(t reflect.Type) bool {
 	return false
 }
 
-func (m *standardRepository) GetAggregates(v reflect.Value, rootID int) error {
+func (m *DomainRepository) GetAggregates(v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 
 	fields, config, err := getFieldAndConfig(t)
@@ -197,7 +199,7 @@ func (m *standardRepository) GetAggregates(v reflect.Value, rootID int) error {
 	return nil
 }
 
-func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
+func (m *DomainRepository) GetByID(id int) (std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
@@ -234,7 +236,7 @@ func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 	return v.Interface().(std.DBModel).ToDomain(), nil
 }
 
-func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
+func (m *DomainRepository) GetAll() ([]std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
@@ -259,7 +261,7 @@ func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
 	return result, nil
 }
 
-func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, error) {
+func (m *DomainRepository) Search(domain std.DomainModel) ([]std.DomainModel, error) {
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
 	dbObject.Set(domain)
@@ -304,7 +306,7 @@ func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, 
 }
 
 // InsertAggregates does not support recursive insert in this implementation
-func (m *standardRepository) InsertAggregates(name string, v reflect.Value, rootID int) error {
+func (m *DomainRepository) InsertAggregates(name string, v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 
 	fields, config, err := getFieldAndConfig(t)
@@ -343,7 +345,7 @@ func (m *standardRepository) InsertAggregates(name string, v reflect.Value, root
 	return nil
 }
 
-func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) {
+func (m *DomainRepository) Insert(domain std.DomainModel) (id int, err error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("INSERT INTO ")
@@ -386,7 +388,7 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 }
 
 // DeleteAggregates does not support recursive in this implementation
-func (m *standardRepository) DeleteAggregates(name string, t reflect.Type, rootID int) error {
+func (m *DomainRepository) DeleteAggregates(name string, t reflect.Type, rootID int) error {
 	_, config, err := getFieldAndConfig(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get config and field: %v`, err)
@@ -405,7 +407,7 @@ func (m *standardRepository) DeleteAggregates(name string, t reflect.Type, rootI
 	return nil
 }
 
-func (m *standardRepository) GetID(v reflect.Value) (int, error) {
+func (m *DomainRepository) GetID(v reflect.Value) (int, error) {
 	t := v.Type()
 
 	config, err := getConfig(t)
@@ -434,7 +436,7 @@ func (m *standardRepository) GetID(v reflect.Value) (int, error) {
 	return id, nil
 }
 
-func (m *standardRepository) GetIDByUUID(uuid string) (int, error) {
+func (m *DomainRepository) GetIDByUUID(uuid string) (int, error) {
 	config, err := getConfig(m.t)
 	if err != nil {
 		return 0, fmt.Errorf(`unable to get type config: %v`, err)
@@ -456,7 +458,7 @@ func (m *standardRepository) GetIDByUUID(uuid string) (int, error) {
 	return id, nil
 }
 
-func (m *standardRepository) Update(domain std.DomainModel) error {
+func (m *DomainRepository) Update(domain std.DomainModel) error {
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
 	dbObject.Set(domain)
@@ -508,7 +510,7 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 
 }
 
-func (m *standardRepository) Delete(uuid string) error {
+func (m *DomainRepository) Delete(uuid string) error {
 	rootID, err := m.GetIDByUUID(uuid)
 	if err != nil {
 		return fmt.Errorf(`unable to get id: %v`, err)

@@ -1,6 +1,8 @@
 package item
 
-import "reflect-test/std"
+import (
+	"reflect-test/v1/internal/std"
+)
 
 type Service interface {
 	std.Service

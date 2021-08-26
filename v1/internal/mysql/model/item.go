@@ -1,13 +1,14 @@
 package model
 
 import (
-	"reflect-test/item"
-	"reflect-test/std"
+	"reflect-test/v1/internal/item"
+	"reflect-test/v1/internal/std"
+	"reflect-test/v1/internal/std/mysql"
 )
 
 type DBItem struct {
 	std.DBRootModel
-	std.DBModelCommon
+	mysql.DBModelCommon
 	Config    struct{} `std:"tableName:item,idField:id,uuidField:uuid"`
 	ID        *int     `db:"id"`
 	UUID      *string  `db:"uuid"`
@@ -53,7 +54,7 @@ func (d *DBItem) Set(domain std.DomainModel) {
 }
 
 type DBLocation struct {
-	std.DBModelCommon
+	mysql.DBModelCommon
 	Config     struct{} `std:"tableName:item_location,idField:id,parentIDField:itemID"`
 	ID         *int     `db:"id"`
 	ItemID     *int     `db:"itemID"`

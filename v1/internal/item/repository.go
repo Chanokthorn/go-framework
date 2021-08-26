@@ -1,9 +1,9 @@
 package item
 
 import (
-	"reflect-test/std"
+	"reflect-test/v1/internal/std/mysql"
 )
 
 type RelationalRepository interface {
-	std.Repository
+	mysql.DomainRepository
 }

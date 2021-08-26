@@ -2,12 +2,12 @@ package mysql
 
 import (
 	"fmt"
-	"reflect-test/mysql/model"
-	"reflect-test/std"
+	"reflect-test/v1/internal/mysql/model"
+	"reflect-test/v1/internal/std/mysql"
 )
 
 type itemRepository struct {
-	std.Repository
+	mysql.DomainRepository
 	db *DB
 }
 
