@@ -8,12 +8,6 @@ import (
 	"reflect-test/std"
 	"strconv"
 	"strings"
-	"time"
-)
-
-const (
-	commonSelect      = `, CreatedBy, UpdatedDate`
-	commonInsertField = `, CreatedBy`
 )
 
 type StdConfig struct {
@@ -74,12 +68,24 @@ func setCreateFieldsSlice(name string, v reflect.Value) error {
 	return nil
 }
 
-func setUpdateFields(date time.Time, v reflect.Value) error {
+func setUpdateFields(name string, v reflect.Value) error {
 	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf(`value must be pointer`)
 	}
 
-	v.Elem().FieldByName("UpdatedDate").Set(reflect.ValueOf(&date))
+	v.Elem().FieldByName("UpdatedBy").Set(reflect.ValueOf(&name))
+
+	return nil
+}
+
+func setUpdateFieldsSlice(name string, v reflect.Value) error {
+	if v.Kind() != reflect.Slice {
+		return fmt.Errorf(`value must be slice`)
+	}
+
+	for i := 0; i < v.Len(); i++ {
+		v.Index(i).FieldByName("UpdatedBy").Set(reflect.ValueOf(&name))
+	}
 
 	return nil
 }
@@ -195,7 +201,7 @@ func (m *standardRepository) GetByID(id int) (std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
 
@@ -232,7 +238,7 @@ func (m *standardRepository) GetAll() ([]std.DomainModel, error) {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
@@ -264,7 +270,7 @@ func (m *standardRepository) Search(domain std.DomainModel) ([]std.DomainModel, 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE IsDeleted = false")
 
@@ -319,8 +325,8 @@ func (m *standardRepository) InsertAggregates(name string, v reflect.Value, root
 
 	txtSQL.WriteString("INSERT INTO ")
 	txtSQL.WriteString(config.TableName)
-	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ", CreatedBy)")
-	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ", :CreatedBy)")
+	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ", CreatedBy, CreatedDate)")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
 
 	res, err := m.db.NamedExec(txtSQL.String(), v.Interface())
 	if err != nil {
@@ -342,8 +348,8 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 
 	txtSQL.WriteString("INSERT INTO ")
 	txtSQL.WriteString(m.config.TableName)
-	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ", CreatedBy)")
-	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ", :CreatedBy)")
+	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate)")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
 
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
@@ -380,7 +386,7 @@ func (m *standardRepository) Insert(domain std.DomainModel) (id int, err error) 
 }
 
 // DeleteAggregates does not support recursive in this implementation
-func (m *standardRepository) DeleteAggregates(t reflect.Type, rootID int) error {
+func (m *standardRepository) DeleteAggregates(name string, t reflect.Type, rootID int) error {
 	_, config, err := getFieldAndConfig(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get config and field: %v`, err)
@@ -388,10 +394,10 @@ func (m *standardRepository) DeleteAggregates(t reflect.Type, rootID int) error 
 
 	var txtSQL strings.Builder
 
-	txtSQL.WriteString("UPDATE " + config.TableName + " SET IsDeleted = true, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
+	txtSQL.WriteString("UPDATE " + config.TableName + " SET IsDeleted = true, UpdatedBy = ?, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
 	txtSQL.WriteString(" WHERE " + config.ParentIDField + " = " + strconv.Itoa(rootID))
 
-	_, err = m.db.Exec(txtSQL.String())
+	_, err = m.db.Exec(txtSQL.String(), name)
 	if err != nil {
 		return fmt.Errorf("unable to update: %v", err)
 	}
@@ -428,17 +434,44 @@ func (m *standardRepository) GetID(v reflect.Value) (int, error) {
 	return id, nil
 }
 
+func (m *standardRepository) GetIDByUUID(uuid string) (int, error) {
+	config, err := getConfig(m.t)
+	if err != nil {
+		return 0, fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT " + config.IDField + " AS id")
+	txtSQL.WriteString(" FROM " + config.TableName)
+	txtSQL.WriteString(" WHERE " + config.UUIDField + " = ? AND IsDeleted = false")
+
+	var id int
+
+	err = m.db.Get(&id, txtSQL.String(), uuid)
+	if err != nil {
+		return 0, err
+	}
+
+	return id, nil
+}
+
 func (m *standardRepository) Update(domain std.DomainModel) error {
 	dbObject := reflect.New(m.t).Interface().(std.DBRootModel)
 
 	dbObject.Set(domain)
+
+	err := setUpdateFields("system", reflect.ValueOf(dbObject))
+	if err != nil {
+		return fmt.Errorf(`unable to set create fields: %v`, err)
+	}
 
 	v := reflect.ValueOf(dbObject)
 	t := reflect.TypeOf(dbObject).Elem()
 
 	var txtSQL strings.Builder
 
-	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
+	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET UpdatedBy = :UpdatedBy, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
 
 	for i := 0; i < t.NumField(); i++ {
 		if field := t.Field(i).Tag.Get("db"); field != "" {
@@ -450,7 +483,7 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = :" + m.config.UUIDField)
 
-	_, err := m.db.NamedExec(txtSQL.String(), dbObject)
+	_, err = m.db.NamedExec(txtSQL.String(), dbObject)
 	if err != nil {
 		return fmt.Errorf("unable to update: %v", err)
 	}
@@ -459,7 +492,7 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates(t.Field(i).Type.Elem(), rootID)
+			err = m.DeleteAggregates("system", t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
@@ -476,12 +509,19 @@ func (m *standardRepository) Update(domain std.DomainModel) error {
 }
 
 func (m *standardRepository) Delete(uuid string) error {
+	rootID, err := m.GetIDByUUID(uuid)
+	if err != nil {
+		return fmt.Errorf(`unable to get id: %v`, err)
+	}
+
 	var txtSQL strings.Builder
 
-	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET IsDeleted = true, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
-	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = " + uuid)
+	name := "system"
 
-	res, err := m.db.Exec(txtSQL.String())
+	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET IsDeleted = true, UpdatedBy = ?, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
+	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = '" + uuid + "'")
+
+	res, err := m.db.Exec(txtSQL.String(), name)
 	if err != nil {
 		return fmt.Errorf("unable to update: %v", err)
 	}
@@ -493,6 +533,17 @@ func (m *standardRepository) Delete(uuid string) error {
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("no rows affeccted")
+	}
+
+	t := m.t
+
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			err = m.DeleteAggregates("system", t.Field(i).Type.Elem(), rootID)
+			if err != nil {
+				return fmt.Errorf(`unable to delete aggregates: %v`, err)
+			}
+		}
 	}
 
 	return nil

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"reflect-test/item"
 	"reflect-test/mysql"
 )
@@ -35,14 +34,15 @@ func main() {
 	//
 	//spew.Dump(searchResult)
 
-	//err = itemService.Delete("585647342")
-	//if err != nil {
-	//	panic(err)
-	//}
+	/////// DELETE ////////
+	err = itemService.Delete("17ab0e1b-87de-46ed-84ce-62453be249b5")
+	if err != nil {
+		panic(err)
+	}
 
 	//////// UPDATE //////
-	//uuid := "726d6cf7-4118-487d-9e2b-a3d7b0dc7e8d"
-	//john := "john2"
+	//uuid := "17ab0e1b-87de-46ed-84ce-62453be249b5"
+	//john := "updated name"
 	//
 	//var newItem item.RelationalItem
 	//err = gofakeit.Struct(&newItem)
@@ -59,12 +59,12 @@ func main() {
 	//}
 
 	///// GET BY ID ///////
-	result, err := itemService.GetByID(150)
-	if err != nil {
-		panic(err)
-	}
-
-	spew.Dump(result)
+	//result, err := itemService.GetByID(150)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(result)
 
 	//result2, err := itemService.GetAll()
 	//if err != nil {
