@@ -25,9 +25,10 @@ func main() {
 	duckService := duck.NewService(duckRepository)
 
 	ctx := context.TODO()
+	spew.Dump()
 
 	/// GET BY ID ///
-	//d, err := duckService.GetByID(ctx, 1)
+	//d, err := duckService.GetByID(ctx, 16)
 	//if err != nil {
 	//	panic(err)
 	//}
@@ -53,6 +54,21 @@ func main() {
 	//spew.Dump(ds)
 
 	/// CREATE ///
+	//var d duck.Duck
+	//
+	//err = gofakeit.Struct(&d)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//id, err := duckService.Create(ctx, d)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(id)
+
+	/// UPDATE ///
 	var d duck.Duck
 
 	err = gofakeit.Struct(&d)
@@ -60,10 +76,20 @@ func main() {
 		panic(err)
 	}
 
-	id, err := duckService.Create(ctx, d)
+	uuid := "0817e1b9-4f83-3549-8645-2b3126d843f0"
+	d.UUID = &uuid
+
+	err = duckService.Update(ctx, d)
 	if err != nil {
 		panic(err)
 	}
 
-	spew.Dump(id)
+	/// DELETE ///
+	//uuid := "96ae1799-8468-3a79-a332-666560aee516"
+	//
+	//err = duckService.Delete(ctx, uuid)
+	//if err != nil {
+	//	panic(err)
+	//}
+
 }

@@ -1,12 +1,11 @@
 package std_mysql
 
 import (
-	"reflect-test/v2/internal/std"
 	"time"
 )
 
-type DBModelCommon struct {
-	DBModel
+type DBRootCommon struct {
+	DBRootModel
 	CreatedBy   *string    `db:"CreatedBy"`
 	CreatedDate *time.Time `db:"CreatedDate"`
 	UpdatedBy   *string    `db:"UpdatedBy"`
@@ -14,24 +13,38 @@ type DBModelCommon struct {
 	IsDeleted   *bool      `db:"IsDeleted"`
 }
 
-type StdConfig struct {
+type DBAggregateCommon struct {
+	DBAggregateModel
+	CreatedBy   *string    `db:"CreatedBy"`
+	CreatedDate *time.Time `db:"CreatedDate"`
+	UpdatedBy   *string    `db:"UpdatedBy"`
+	UpdatedDate *time.Time `db:"UpdatedDate"`
+	IsDeleted   *bool      `db:"IsDeleted"`
+}
+
+type RootModelConfig struct {
+	TableName string
+	IDField   string
+	UUIDField string
+}
+
+type AggregateModelConfig struct {
 	TableName         string
 	IDField           string
 	UUIDField         string
-	ParentIDField     string
+	RootIDField       string
 	RecursiveOnGetAll bool
 }
 
 type DBModel interface {
-	GetConfig() StdConfig
 }
 
 type DBRootModel interface {
 	DBModel
-	Set(domain std.DomainModel)
+	GetConfig() RootModelConfig
 }
 
 type DBAggregateModel interface {
 	DBModel
-	Set(domain std.DomainModel)
+	GetConfig() AggregateModelConfig
 }

@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"reflect"
 	"reflect-test/v1/internal/mysql/model"
 	"reflect-test/v1/internal/std"
@@ -230,8 +229,6 @@ func (m *DomainRepository) GetByID(id int) (std.DomainModel, error) {
 			}
 		}
 	}
-
-	spew.Dump(v.Interface().(std.DBModel))
 
 	return v.Interface().(std.DBModel).ToDomain(), nil
 }
