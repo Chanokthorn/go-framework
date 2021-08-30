@@ -68,7 +68,6 @@ func (e *Egg) GetConfig() stdMysql.AggregateModelConfig {
 	return stdMysql.AggregateModelConfig{
 		TableName:         "egg",
 		IDField:           "EggID",
-		UUIDField:         "EggUUID",
 		RootIDField:       "DuckID",
 		RecursiveOnGetAll: false,
 	}
@@ -85,5 +84,22 @@ func (e *Egg) ToModel() duck.Egg {
 	return duck.Egg{
 		Name: e.Name,
 		Age:  e.Age,
+	}
+}
+
+type FavouriteMenu struct {
+	stdMysql.DBUpdatableAggregateCommon
+	ID     *int    `db:"FavouriteMenuID"`
+	RootID *int    `db:"DuckID"`
+	UUID   *string `db:"FavouriteMenuUUID"`
+	Name   *string `db:"Name" std:"compare"`
+}
+
+func (fm *FavouriteMenu) GetConfig() stdMysql.UpdatableAggregateModelConfig {
+	return stdMysql.UpdatableAggregateModelConfig{
+		TableName:   "favourite_menus",
+		IDField:     "FavouriteMenuID",
+		UUIDField:   "FavouriteMenuUUID",
+		RootIDField: "DuckID",
 	}
 }

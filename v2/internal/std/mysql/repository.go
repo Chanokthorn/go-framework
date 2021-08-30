@@ -27,6 +27,10 @@ func getAggregateConfig(t reflect.Type) (AggregateModelConfig, error) {
 	return reflect.New(t).Interface().(DBAggregateModel).GetConfig(), nil
 }
 
+func getUpdAggregateConfig(t reflect.Type) (UpdatableAggregateModelConfig, error) {
+	return reflect.New(t).Interface().(DBUpdatableAggregateModel).GetConfig(), nil
+}
+
 func getRootFieldAndConfig(t reflect.Type) ([]string, RootModelConfig, error) {
 	config, err := getRootConfig(t)
 	if err != nil {
@@ -42,6 +46,17 @@ func getAggregateFieldAndConfig(t reflect.Type) ([]string, AggregateModelConfig,
 	config, err := getAggregateConfig(t)
 	if err != nil {
 		return nil, AggregateModelConfig{}, fmt.Errorf(`unable to get type config: %v`, err)
+	}
+
+	fields := getFields(t)
+
+	return fields, config, nil
+}
+
+func getUpdAggregateFieldAndConfig(t reflect.Type) ([]string, UpdatableAggregateModelConfig, error) {
+	config, err := getUpdAggregateConfig(t)
+	if err != nil {
+		return nil, UpdatableAggregateModelConfig{}, fmt.Errorf(`unable to get type config: %v`, err)
 	}
 
 	fields := getFields(t)
@@ -309,6 +324,46 @@ func (m *MysqlRepository) InsertAggregates(name string, v reflect.Value, rootID 
 	t := v.Type().Elem()
 
 	fields, config, err := getAggregateFieldAndConfig(t)
+	if err != nil {
+		return fmt.Errorf(`unable to get config and field: %v`, err)
+	}
+
+	for i := 0; i < v.Len(); i++ {
+		v.Index(i).FieldByName("RootID").Set(reflect.ValueOf(&rootID))
+	}
+
+	err = setCreateFieldsSlice(name, v)
+	if err != nil {
+		return fmt.Errorf(`unable to set create fields: %v`, err)
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("INSERT INTO ")
+	txtSQL.WriteString(config.TableName)
+	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ", CreatedBy, CreatedDate)")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
+
+	res, err := m.db.NamedExec(txtSQL.String(), v.Interface())
+	if err != nil {
+		return fmt.Errorf(`unable to insert: %v`, err)
+	}
+
+	_, err = res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf(`unable to inserted id: %v`, err)
+	}
+
+	// TODO: recursive implementation
+
+	return nil
+}
+
+// InsertAggregates does not support recursive insert in this implementation
+func (m *MysqlRepository) InsertUpdAggregates(name string, v reflect.Value, rootID int) error {
+	t := v.Type().Elem()
+
+	fields, config, err := getUpdAggregateFieldAndConfig(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get config and field: %v`, err)
 	}

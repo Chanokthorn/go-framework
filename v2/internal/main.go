@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/davecgh/go-spew/spew"
 	"reflect-test/v2/internal/duck"
 	"reflect-test/v2/internal/mysql"
@@ -44,14 +43,14 @@ func main() {
 	//spew.Dump(ds)
 
 	/// SEARCH ///
-	//color := "white"
-	//d := duck.Duck{Color: &color}
-	//ds, err := duckService.Search(ctx, d)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//spew.Dump(ds)
+	color := "white"
+	d := duck.Duck{Color: &color}
+	ds, err := duckService.Search(ctx, d)
+	if err != nil {
+		panic(err)
+	}
+
+	spew.Dump(ds)
 
 	/// CREATE ///
 	//var d duck.Duck
@@ -69,20 +68,20 @@ func main() {
 	//spew.Dump(id)
 
 	/// UPDATE ///
-	var d duck.Duck
-
-	err = gofakeit.Struct(&d)
-	if err != nil {
-		panic(err)
-	}
-
-	uuid := "0817e1b9-4f83-3549-8645-2b3126d843f0"
-	d.UUID = &uuid
-
-	err = duckService.Update(ctx, d)
-	if err != nil {
-		panic(err)
-	}
+	//var d duck.Duck
+	//
+	//err = gofakeit.Struct(&d)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//uuid := "0817e1b9-4f83-3549-8645-2b3126d843f0"
+	//d.UUID = &uuid
+	//
+	//err = duckService.Update(ctx, d)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	/// DELETE ///
 	//uuid := "96ae1799-8468-3a79-a332-666560aee516"
