@@ -23,17 +23,16 @@ type DBAggregateCommon struct {
 }
 
 type RootModelConfig struct {
-	TableName string
-	IDField   string
-	UUIDField string
+	TableName   string
+	IDField     string
+	UUIDField   string
+	RootIDField string
 }
 
 type AggregateModelConfig struct {
-	TableName         string
-	IDField           string
-	UUIDField         string
-	RootIDField       string
-	RecursiveOnGetAll bool
+	TableName   string
+	IDField     string
+	RootIDField string
 }
 
 type DBModel interface {

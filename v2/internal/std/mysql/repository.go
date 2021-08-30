@@ -12,6 +12,8 @@ import (
 
 type Repository interface {
 	GetByID(ctx context.Context, dest interface{}, id int) error
+	GetByUUID(ctx context.Context, dest interface{}, uuid string) error
+	GetByRootID(ctx context.Context, dest interface{}, rootID int) error
 	GetAll(ctx context.Context, dest interface{}) error
 	Search(ctx context.Context, dest interface{}, model DBModel) error
 	Insert(ctx context.Context, model DBModel) (id int, err error)
@@ -62,7 +64,7 @@ func getFields(t reflect.Type) []string {
 	return fields
 }
 
-func setCreateFields(name string, v reflect.Value) error {
+func setCreateFields(name string, config RootModelConfig, v reflect.Value) error {
 	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf(`value must be pointer`)
 	}
@@ -70,7 +72,7 @@ func setCreateFields(name string, v reflect.Value) error {
 	u, _ := uuid.FromString(uuid.NewV4().String())
 	generatedUUID := uuid.NewV3(u, "www.qchang.com").String()
 
-	v.Elem().FieldByName("UUID").Set(reflect.ValueOf(&generatedUUID))
+	v.Elem().FieldByName(config.UUIDField).Set(reflect.ValueOf(&generatedUUID))
 	v.Elem().FieldByName("CreatedBy").Set(reflect.ValueOf(&name))
 
 	return nil
@@ -214,10 +216,6 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
 
-	s := txtSQL.String()
-
-	println(s)
-
 	err := m.db.Get(dest, txtSQL.String(), id)
 	if err != nil {
 		return fmt.Errorf(`unable to get: %v`, err)
@@ -233,6 +231,69 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 				return fmt.Errorf(`unable to get aggregates: %v`, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid string) error {
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = ? AND IsDeleted = false")
+
+	err := m.db.Get(dest, txtSQL.String(), uuid)
+	if err != nil {
+		return fmt.Errorf(`unable to get: %v`, err)
+	}
+
+	v := reflect.ValueOf(dest)
+	t := reflect.TypeOf(dest).Elem()
+
+	id := int(v.Elem().FieldByName(m.config.IDField).Elem().Int())
+	if id == 0 {
+		return fmt.Errorf(`unable to get id`)
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			err = m.GetAggregates(v.Elem().Field(i), id)
+			if err != nil {
+				return fmt.Errorf(`unable to get aggregates: %v`, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *MysqlRepository) GetByRootID(ctx context.Context, dest interface{}, rootID int) error {
+	if m.config.RootIDField == "" {
+		return fmt.Errorf(`the type does not have root id field`)
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE " + m.config.RootIDField + " = ? AND IsDeleted = false")
+
+	items := reflect.New(reflect.SliceOf(m.t)).Interface()
+
+	err := m.db.Select(items, txtSQL.String(), rootID)
+	if err != nil {
+		return fmt.Errorf(`unable to get all: %v`, err)
+	}
+
+	s := reflect.Indirect(reflect.ValueOf(items))
+
+	v := reflect.ValueOf(dest).Elem()
+
+	for i := 0; i < s.Len(); i++ {
+		v.Set(reflect.Append(v, s.Index(i)))
 	}
 
 	return nil
@@ -314,7 +375,7 @@ func (m *MysqlRepository) InsertAggregates(name string, v reflect.Value, rootID 
 	}
 
 	for i := 0; i < v.Len(); i++ {
-		v.Index(i).FieldByName("RootID").Set(reflect.ValueOf(&rootID))
+		v.Index(i).FieldByName(config.RootIDField).Set(reflect.ValueOf(&rootID))
 	}
 
 	err = setCreateFieldsSlice(name, v)
@@ -352,7 +413,7 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate)")
 	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
 
-	err = setCreateFields("system", reflect.ValueOf(model))
+	err = setCreateFields("system", m.config, reflect.ValueOf(model))
 	if err != nil {
 		return 0, fmt.Errorf(`unable to set creaet fields: %v`, err)
 	}
@@ -390,7 +451,7 @@ func (m *MysqlRepository) GetID(v reflect.Value) (int, error) {
 		return 0, fmt.Errorf(`unable to get type config: %v`, err)
 	}
 
-	uuid := v.FieldByName("UUID").Elem().Interface().(string)
+	uuid := v.FieldByName(m.config.UUIDField).Elem().Interface().(string)
 	if uuid == "" {
 		return 0, fmt.Errorf(`uuid is emtpy`)
 	}

@@ -20,6 +20,17 @@ func NewDuckRepository(db *stdMysql.DB) (duck.Repository, error) {
 	return &duckRepository{Repository: stdRepository}, nil
 }
 
+func (dr *duckRepository) Get(ctx context.Context, uuid string) (duck.Duck, error) {
+	var d model.Duck
+
+	err := dr.Repository.GetByUUID(ctx, &d, uuid)
+	if err != nil {
+		return duck.Duck{}, fmt.Errorf(`unable to get by uuid: %v`, err)
+	}
+
+	return d.ToModel(), nil
+}
+
 func (dr *duckRepository) GetByID(ctx context.Context, id int) (duck.Duck, error) {
 	var d model.Duck
 

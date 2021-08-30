@@ -25,7 +25,7 @@ func (s *service) Search(ctx context.Context, dReq Duck) ([]Duck, error) {
 }
 
 func (s *service) GetByUUID(ctx context.Context, uuid string) (Duck, error) {
-	panic("implement me")
+	return s.repository.Get(ctx, uuid)
 }
 
 func (s *service) Create(ctx context.Context, dReq Duck) (int, error) {

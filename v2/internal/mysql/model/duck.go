@@ -7,11 +7,11 @@ import (
 
 type Duck struct {
 	stdMysql.DBRootCommon
-	ID    *int    `db:"DuckID"`
-	UUID  *string `db:"DuckUUID"`
-	Name  *string `db:"Name"`
-	Color *string `db:"Color"`
-	Eggs  []Egg   `fakesize:"3"`
+	DuckID   *int    `db:"DuckID"`
+	DuckUUID *string `db:"DuckUUID"`
+	Name     *string `db:"Name"`
+	Color    *string `db:"Color"`
+	Eggs     []Egg
 }
 
 func (d *Duck) GetConfig() stdMysql.RootModelConfig {
@@ -31,11 +31,11 @@ func NewDuck(dReq duck.Duck) *Duck {
 	}
 
 	return &Duck{
-		ID:    dReq.ID,
-		UUID:  dReq.UUID,
-		Name:  dReq.Name,
-		Color: dReq.Color,
-		Eggs:  es,
+		DuckID:   dReq.DuckID,
+		DuckUUID: dReq.DuckUUID,
+		Name:     dReq.Name,
+		Color:    dReq.Color,
+		Eggs:     es,
 	}
 }
 
@@ -48,29 +48,27 @@ func (d *Duck) ToModel() duck.Duck {
 	}
 
 	return duck.Duck{
-		ID:    d.ID,
-		UUID:  d.UUID,
-		Name:  d.Name,
-		Color: d.Color,
-		Eggs:  es,
+		DuckID:   d.DuckID,
+		DuckUUID: d.DuckUUID,
+		Name:     d.Name,
+		Color:    d.Color,
+		Eggs:     es,
 	}
 }
 
 type Egg struct {
 	stdMysql.DBAggregateCommon
-	ID     *int    `db:"EggID"`
-	RootID *int    `db:"DuckID"`
+	EggID  *int    `db:"EggID"`
+	DuckID *int    `db:"DuckID"`
 	Name   *string `db:"Name"`
 	Age    *int    `db:"Age"`
 }
 
 func (e *Egg) GetConfig() stdMysql.AggregateModelConfig {
 	return stdMysql.AggregateModelConfig{
-		TableName:         "egg",
-		IDField:           "EggID",
-		UUIDField:         "EggUUID",
-		RootIDField:       "DuckID",
-		RecursiveOnGetAll: false,
+		TableName:   "egg",
+		IDField:     "EggID",
+		RootIDField: "DuckID",
 	}
 }
 

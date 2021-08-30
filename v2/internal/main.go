@@ -28,7 +28,15 @@ func main() {
 	spew.Dump()
 
 	/// GET BY ID ///
-	//d, err := duckService.GetByID(ctx, 16)
+	//d, err := duckService.GetByID(ctx, 29)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(d)
+
+	/// GET BY UUID ///
+	//d, err := duckService.GetByUUID(ctx, "23123462-f076-3017-89d4-635be9b90d6f")
 	//if err != nil {
 	//	panic(err)
 	//}
@@ -76,8 +84,8 @@ func main() {
 		panic(err)
 	}
 
-	uuid := "0817e1b9-4f83-3549-8645-2b3126d843f0"
-	d.UUID = &uuid
+	uuid := "23123462-f076-3017-89d4-635be9b90d6f"
+	d.DuckUUID = &uuid
 
 	err = duckService.Update(ctx, d)
 	if err != nil {
