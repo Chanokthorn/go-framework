@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/davecgh/go-spew/spew"
-	"reflect-test/v2/internal/duck"
 	"reflect-test/v2/internal/mysql"
+	"reflect-test/v2/internal/pond"
 	"reflect-test/v2/internal/std/mysql"
 )
 
@@ -17,12 +17,17 @@ func main() {
 		panic(err)
 	}
 
-	duckRepository, err := mysql.NewDuckRepository(db)
+	//duckRepository, err := mysql.NewDuckRepository(db)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//duckService := duck.NewService(duckRepository)
+
+	pondService, err := mysql.NewPondService(db)
 	if err != nil {
 		panic(err)
 	}
-
-	duckService := duck.NewService(duckRepository)
 
 	ctx := context.TODO()
 	spew.Dump()
@@ -77,20 +82,20 @@ func main() {
 	//spew.Dump(id)
 
 	/// UPDATE ///
-	var d duck.Duck
-
-	err = gofakeit.Struct(&d)
-	if err != nil {
-		panic(err)
-	}
-
-	uuid := "23123462-f076-3017-89d4-635be9b90d6f"
-	d.DuckUUID = &uuid
-
-	err = duckService.Update(ctx, d)
-	if err != nil {
-		panic(err)
-	}
+	//var d duck.Duck
+	//
+	//err = gofakeit.Struct(&d)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//uuid := "23123462-f076-3017-89d4-635be9b90d6f"
+	//d.DuckUUID = &uuid
+	//
+	//err = duckService.Update(ctx, d)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	/// DELETE ///
 	//uuid := "96ae1799-8468-3a79-a332-666560aee516"
@@ -99,5 +104,20 @@ func main() {
 	//if err != nil {
 	//	panic(err)
 	//}
+
+	////////////////////// POND /////////////////////
+	var p pond.Pond
+
+	err = gofakeit.Struct(&p)
+	if err != nil {
+		panic(err)
+	}
+
+	id, err := pondService.Create(ctx, p)
+	if err != nil {
+		panic(err)
+	}
+
+	spew.Dump(id)
 
 }
