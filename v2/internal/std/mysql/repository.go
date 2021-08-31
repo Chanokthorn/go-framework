@@ -268,10 +268,6 @@ func (m *MysqlRepository) GetByUUIDs(ctx context.Context, dest interface{}, uuid
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " IN ('" + strings.Join(uuids, "', '") + "') AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.UUIDField + ", '" + strings.Join(uuids, "', '") + "')")
 
-	ss := txtSQL.String()
-
-	println(ss)
-
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
 
 	err := m.db.Select(items, txtSQL.String())
@@ -375,10 +371,6 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " IN (" + generateIntSliceString(ids, "", ", ") + ") AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.IDField + ", " + generateIntSliceString(ids, "", ", ") + ")")
 
-	ss := txtSQL.String()
-
-	println(ss)
-
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
 
 	err := m.db.Select(items, txtSQL.String())
@@ -392,7 +384,39 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 }
 
 func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}) error {
-	panic("implement me")
+	v := reflect.ValueOf(src)
+
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {
+		return fmt.Errorf(`src must be pointer to slice`)
+	}
+
+	if reflect.TypeOf(src).Elem().Elem() != m.t {
+		fmt.Errorf(`invalid input type, must be %s`, m.t.String())
+	}
+
+	uuids := []string{}
+	for i := 0; i < v.Elem().Len(); i++ {
+		uuids = append(uuids, v.Elem().Index(i).FieldByName(m.config.UUIDField).Elem().String())
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " IN ('" + strings.Join(uuids, "', '") + "') AND IsDeleted = false")
+	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.UUIDField + ", '" + strings.Join(uuids, "', '") + "')")
+
+	items := reflect.New(reflect.SliceOf(m.t)).Interface()
+
+	err := m.db.Select(items, txtSQL.String())
+	if err != nil {
+		return fmt.Errorf(`unable to get all: %v`, err)
+	}
+
+	v.Elem().Set(reflect.ValueOf(items).Elem())
+
+	return nil
 }
 
 func (m *MysqlRepository) FillStructByID(ctx context.Context, src interface{}) error {

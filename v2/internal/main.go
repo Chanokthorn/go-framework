@@ -69,11 +69,23 @@ func main() {
 	//spew.Dump(d)
 
 	/// FILL STRUCTS BY ID ///
-	id1 := 28
-	id2 := 27
-	id3 := 29
-	ds := []model.Duck{{DuckID: &id1}, {DuckID: &id2}, {DuckID: &id3}}
-	err = duckDBRepository.FillStructsByID(ctx, &ds)
+	//id1 := 28
+	//id2 := 27
+	//id3 := 29
+	//ds := []model.Duck{{DuckID: &id1}, {DuckID: &id2}, {DuckID: &id3}}
+	//err = duckDBRepository.FillStructsByID(ctx, &ds)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(ds)
+
+	/// FILL STRUCTS BY ID ///
+	uuid1 := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
+	uuid2 := "35698f21-32dd-37a6-8828-a483dec40c13"
+	uuid3 := "23123462-f076-3017-89d4-635be9b90d6f"
+	ds := []model.Duck{{DuckUUID: &uuid1}, {DuckUUID: &uuid2}, {DuckUUID: &uuid3}}
+	err = duckDBRepository.FillStructsByUUID(ctx, &ds)
 	if err != nil {
 		panic(err)
 	}
