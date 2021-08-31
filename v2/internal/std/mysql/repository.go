@@ -3,6 +3,7 @@ package std_mysql
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jmoiron/sqlx"
 	uuid "github.com/satori/go.uuid"
 	"reflect"
@@ -237,10 +238,6 @@ func (m *MysqlRepository) GetByIDs(ctx context.Context, dest interface{}, ids []
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " IN (" + generateIntSliceString(ids, "", ", ") + ") AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.IDField + ", " + generateIntSliceString(ids, "", ", ") + ")")
 
-	ss := txtSQL.String()
-
-	println(ss)
-
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
 
 	err := m.db.Select(items, txtSQL.String())
@@ -358,6 +355,10 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 		fmt.Errorf(`invalid input type, must be %s`, m.t.String())
 	}
 
+	if v.Elem().Len() == 0 {
+		return nil
+	}
+
 	ids := []int{}
 	for i := 0; i < v.Elem().Len(); i++ {
 		ids = append(ids, int(v.Elem().Index(i).FieldByName(m.config.IDField).Elem().Int()))
@@ -394,6 +395,10 @@ func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}
 		fmt.Errorf(`invalid input type, must be %s`, m.t.String())
 	}
 
+	if v.Elem().Len() == 0 {
+		return nil
+	}
+
 	uuids := []string{}
 	for i := 0; i < v.Elem().Len(); i++ {
 		uuids = append(uuids, v.Elem().Index(i).FieldByName(m.config.UUIDField).Elem().String())
@@ -421,6 +426,7 @@ func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}
 
 func (m *MysqlRepository) FillStructByID(ctx context.Context, src interface{}) error {
 	v := reflect.ValueOf(src)
+	spew.Dump(v)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf(`src must be pointer to struct`)
 	}
@@ -547,6 +553,10 @@ func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DB
 
 // InsertAggregates does not support recursive insert in this implementation
 func (m *MysqlRepository) InsertAggregates(name string, v reflect.Value, rootID int) error {
+	if v.Len() == 0 {
+		return nil
+	}
+
 	t := v.Type().Elem()
 
 	fields, config, err := getAggregateFieldAndConfig(t)

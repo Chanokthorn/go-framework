@@ -2,17 +2,18 @@ package model
 
 import (
 	"reflect-test/v2/internal/duck"
+	"reflect-test/v2/internal/pond"
 	stdMysql "reflect-test/v2/internal/std/mysql"
 )
 
 type Duck struct {
 	stdMysql.DBRootCommon
-	DuckID   *int    `db:"DuckID"`
-	DuckUUID *string `db:"DuckUUID"`
-	Name     *string `db:"Name"`
-	Color    *string `db:"Color"`
-	Eggs     []Egg
-	DuckPond []DuckPond
+	DuckID    *int    `db:"DuckID"`
+	DuckUUID  *string `db:"DuckUUID"`
+	Name      *string `db:"Name"`
+	Color     *string `db:"Color"`
+	Eggs      []Egg
+	DuckPonds []DuckPond
 }
 
 func (d *Duck) GetConfig() stdMysql.RootModelConfig {
@@ -25,26 +26,45 @@ func (d *Duck) GetConfig() stdMysql.RootModelConfig {
 
 func NewDuck(dReq duck.Duck) *Duck {
 	var es []Egg
+
 	if dReq.Eggs != nil {
 		for _, e := range dReq.Eggs {
 			es = append(es, *NewEgg(e))
 		}
 	}
 
+	var dps []DuckPond
+
+	if dReq.Ponds != nil {
+		for _, p := range dReq.Ponds {
+			dps = append(dps, NewDuckPond(*p.PondID))
+		}
+	}
+
 	return &Duck{
-		DuckID:   dReq.DuckID,
-		DuckUUID: dReq.DuckUUID,
-		Name:     dReq.Name,
-		Color:    dReq.Color,
-		Eggs:     es,
+		DuckID:    dReq.DuckID,
+		DuckUUID:  dReq.DuckUUID,
+		Name:      dReq.Name,
+		Color:     dReq.Color,
+		Eggs:      es,
+		DuckPonds: dps,
 	}
 }
 
 func (d *Duck) ToModel() duck.Duck {
 	var es []duck.Egg
+
 	if d.Eggs != nil {
 		for _, e := range d.Eggs {
 			es = append(es, e.ToModel())
+		}
+	}
+
+	var ps []pond.Pond
+
+	if d.DuckPonds != nil {
+		for _, dp := range d.DuckPonds {
+			ps = append(ps, dp.ToModel())
 		}
 	}
 
@@ -54,6 +74,7 @@ func (d *Duck) ToModel() duck.Duck {
 		Name:     d.Name,
 		Color:    d.Color,
 		Eggs:     es,
+		Ponds:    ps,
 	}
 }
 
@@ -88,4 +109,24 @@ func (e *Egg) ToModel() duck.Egg {
 }
 
 type DuckPond struct {
+	stdMysql.DBAggregateCommon
+	DuckPondID *int `db:"DuckPondID"`
+	DuckID     *int `db:"DuckID"`
+	PondID     *int `db:"PondID"`
+}
+
+func (dp *DuckPond) GetConfig() stdMysql.AggregateModelConfig {
+	return stdMysql.AggregateModelConfig{
+		TableName:   "duck_pond",
+		IDField:     "DuckPondID",
+		RootIDField: "DuckID",
+	}
+}
+
+func NewDuckPond(pondID int) DuckPond {
+	return DuckPond{PondID: &pondID}
+}
+
+func (dp *DuckPond) ToModel() pond.Pond {
+	return pond.Pond{PondID: dp.PondID}
 }

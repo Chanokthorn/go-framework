@@ -41,6 +41,14 @@ func (ps *pondService) Get(ctx context.Context, uuid string) (pond.Pond, error) 
 	return p, nil
 }
 
+func (ps *pondService) FillStructsByUUID(ctx context.Context, ponds *[]pond.Pond) error {
+	return ps.Repository.FillStructsByUUID(ctx, ponds)
+}
+
+func (ps *pondService) FillStructsByID(ctx context.Context, ponds *[]pond.Pond) error {
+	return ps.Repository.FillStructsByID(ctx, ponds)
+}
+
 func (ps *pondService) Create(ctx context.Context, pondReq pond.Pond) (int, error) {
 	id, err := ps.Repository.Insert(ctx, &pondReq)
 	if err != nil {
