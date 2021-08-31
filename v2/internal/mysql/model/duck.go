@@ -12,6 +12,7 @@ type Duck struct {
 	Name     *string `db:"Name"`
 	Color    *string `db:"Color"`
 	Eggs     []Egg
+	DuckPond []DuckPond
 }
 
 func (d *Duck) GetConfig() stdMysql.RootModelConfig {
@@ -84,4 +85,7 @@ func (e *Egg) ToModel() duck.Egg {
 		Name: e.Name,
 		Age:  e.Age,
 	}
+}
+
+type DuckPond struct {
 }
