@@ -20,6 +20,40 @@ func NewDuckRepository(db *stdMysql.DB) (duck.Repository, error) {
 	return &duckRepository{Repository: stdRepository}, nil
 }
 
+func (dr *duckRepository) GetByIDs(ctx context.Context, ids []int) ([]duck.Duck, error) {
+	ds := []model.Duck{}
+
+	err := dr.Repository.GetByIDs(ctx, &ds, ids)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to get by ids %v`, err)
+	}
+
+	dRes := []duck.Duck{}
+
+	for _, d := range ds {
+		dRes = append(dRes, d.ToModel())
+	}
+
+	return dRes, nil
+}
+
+func (dr *duckRepository) GetByUUIDs(ctx context.Context, uuids []string) ([]duck.Duck, error) {
+	ds := []model.Duck{}
+
+	err := dr.Repository.GetByUUIDs(ctx, &ds, uuids)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to get by uuids %v`, err)
+	}
+
+	dRes := []duck.Duck{}
+
+	for _, d := range ds {
+		dRes = append(dRes, d.ToModel())
+	}
+
+	return dRes, nil
+}
+
 func (dr *duckRepository) Get(ctx context.Context, uuid string) (duck.Duck, error) {
 	var d model.Duck
 

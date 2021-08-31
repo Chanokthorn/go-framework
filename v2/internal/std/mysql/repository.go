@@ -11,6 +11,8 @@ import (
 )
 
 type Repository interface {
+	GetByIDs(ctx context.Context, dest interface{}, ids []int) error
+	GetByUUIDs(ctx context.Context, dest interface{}, uuids []string) error
 	GetByID(ctx context.Context, dest interface{}, id int) error
 	GetByUUID(ctx context.Context, dest interface{}, uuid string) error
 	GetByRootID(ctx context.Context, dest interface{}, rootID int) error
@@ -177,7 +179,7 @@ func implementsDBAggregateModelSlice(t reflect.Type) bool {
 	return false
 }
 
-func (m *MysqlRepository) GetAggregates(v reflect.Value, rootID int) error {
+func (m *MysqlRepository) getAggregates(v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 
 	fields, config, err := getAggregateFieldAndConfig(t)
@@ -208,6 +210,82 @@ func (m *MysqlRepository) GetAggregates(v reflect.Value, rootID int) error {
 	return nil
 }
 
+func generateIntSliceString(intSlice []int, prefix string, delim string) string {
+	var txt strings.Builder
+
+	for i, int := range intSlice {
+		if i > 0 {
+			txt.WriteString(delim)
+		}
+
+		txt.WriteString(prefix + strconv.Itoa(int))
+	}
+
+	return txt.String()
+}
+
+func (m *MysqlRepository) GetByIDs(ctx context.Context, dest interface{}, ids []int) error {
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE " + m.config.IDField + " IN (" + generateIntSliceString(ids, "", ", ") + ") AND IsDeleted = false")
+	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.IDField + ", " + generateIntSliceString(ids, "", ", ") + ")")
+
+	ss := txtSQL.String()
+
+	println(ss)
+
+	items := reflect.New(reflect.SliceOf(m.t)).Interface()
+
+	err := m.db.Select(items, txtSQL.String())
+	if err != nil {
+		return fmt.Errorf(`unable to get all: %v`, err)
+	}
+
+	s := reflect.Indirect(reflect.ValueOf(items))
+
+	v := reflect.ValueOf(dest).Elem()
+
+	for i := 0; i < s.Len(); i++ {
+		v.Set(reflect.Append(v, s.Index(i)))
+	}
+
+	return nil
+}
+
+func (m *MysqlRepository) GetByUUIDs(ctx context.Context, dest interface{}, uuids []string) error {
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " IN ('" + strings.Join(uuids, "', '") + "') AND IsDeleted = false")
+	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.UUIDField + ", '" + strings.Join(uuids, "', '") + "')")
+
+	ss := txtSQL.String()
+
+	println(ss)
+
+	items := reflect.New(reflect.SliceOf(m.t)).Interface()
+
+	err := m.db.Select(items, txtSQL.String())
+	if err != nil {
+		return fmt.Errorf(`unable to get all: %v`, err)
+	}
+
+	s := reflect.Indirect(reflect.ValueOf(items))
+
+	v := reflect.ValueOf(dest).Elem()
+
+	for i := 0; i < s.Len(); i++ {
+		v.Set(reflect.Append(v, s.Index(i)))
+	}
+
+	return nil
+}
+
 func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int) error {
 	var txtSQL strings.Builder
 
@@ -226,7 +304,7 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.GetAggregates(v.Elem().Field(i), id)
+			err = m.getAggregates(v.Elem().Field(i), id)
 			if err != nil {
 				return fmt.Errorf(`unable to get aggregates: %v`, err)
 			}
@@ -259,7 +337,7 @@ func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid 
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.GetAggregates(v.Elem().Field(i), id)
+			err = m.getAggregates(v.Elem().Field(i), id)
 			if err != nil {
 				return fmt.Errorf(`unable to get aggregates: %v`, err)
 			}
