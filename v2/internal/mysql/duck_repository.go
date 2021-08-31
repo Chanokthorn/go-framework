@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"reflect-test/v2/internal/duck"
 	"reflect-test/v2/internal/mysql/model"
 	stdMysql "reflect-test/v2/internal/std/mysql"
@@ -12,7 +13,7 @@ type duckRepository struct {
 	stdMysql.Repository
 }
 
-func NewDuckRepository(db *stdMysql.DB) (duck.Repository, error) {
+func NewDuckRepository(db *sqlx.DB) (duck.Repository, error) {
 	stdRepository, err := stdMysql.NewRepository(model.Duck{}, db)
 	if err != nil {
 		return nil, fmt.Errorf(`unable to instantiate std repository: %v`, err)

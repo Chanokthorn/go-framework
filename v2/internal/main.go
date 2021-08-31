@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
+	"reflect-test/v2/internal/duck"
+	"reflect-test/v2/internal/mysql"
 	"reflect-test/v2/internal/mysql/model"
+	"reflect-test/v2/internal/std"
 	"reflect-test/v2/internal/std/mysql"
 )
 
@@ -15,19 +18,23 @@ func main() {
 		panic(err)
 	}
 
+	std.SetTxProvider(db, nil)
+
 	duckDBRepository, err := std_mysql.NewRepository(model.Duck{}, db)
 	if err != nil {
 		panic(err)
 	}
 
-	//duckRepository, err := mysql.NewDuckRepository(db)
-	//if err != nil {
-	//	panic(err)
-	//}
+	duckRepository, err := mysql.NewDuckRepository(db)
+	if err != nil {
+		panic(err)
+	}
 
-	//duckService := duck.NewService(duckRepository)
+	duckService := duck.NewService(duckRepository)
 
 	ctx := context.TODO()
+	ctx = std.SetProfile(ctx, std.Profile{std.UserPermission{UserUUID: "1212312121"}})
+	println(duckDBRepository, duckRepository, duckService)
 	spew.Dump()
 
 	/// GET BY ID SLICE ///
@@ -81,16 +88,16 @@ func main() {
 	//spew.Dump(ds)
 
 	/// FILL STRUCTS BY ID ///
-	uuid1 := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
-	uuid2 := "35698f21-32dd-37a6-8828-a483dec40c13"
-	uuid3 := "23123462-f076-3017-89d4-635be9b90d6f"
-	ds := []model.Duck{{DuckUUID: &uuid1}, {DuckUUID: &uuid2}, {DuckUUID: &uuid3}}
-	err = duckDBRepository.FillStructsByUUID(ctx, &ds)
-	if err != nil {
-		panic(err)
-	}
-
-	spew.Dump(ds)
+	//uuid1 := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
+	//uuid2 := "35698f21-32dd-37a6-8828-a483dec40c13"
+	//uuid3 := "23123462-f076-3017-89d4-635be9b90d6f"
+	//ds := []model.Duck{{DuckUUID: &uuid1}, {DuckUUID: &uuid2}, {DuckUUID: &uuid3}}
+	//err = duckDBRepository.FillStructsByUUID(ctx, &ds)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(ds)
 
 	/// GET BY ID ///
 	//d, err := duckService.GetByID(ctx, 29)
@@ -149,7 +156,7 @@ func main() {
 	//	panic(err)
 	//}
 	//
-	//uuid := "23123462-f076-3017-89d4-635be9b90d6f"
+	//uuid := "4a7bdf09-6744-357f-a0d8-08705e23fe73"
 	//d.DuckUUID = &uuid
 	//
 	//err = duckService.Update(ctx, d)
@@ -158,11 +165,11 @@ func main() {
 	//}
 
 	/// DELETE ///
-	//uuid := "96ae1799-8468-3a79-a332-666560aee516"
-	//
-	//err = duckService.Delete(ctx, uuid)
-	//if err != nil {
-	//	panic(err)
-	//}
+	uuid := "4a7bdf09-6744-357f-a0d8-08705e23fe73"
+
+	err = duckService.Delete(ctx, uuid)
+	if err != nil {
+		panic(err)
+	}
 
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	uuid "github.com/satori/go.uuid"
 	"reflect"
+	"reflect-test/v2/internal/std"
 	"strconv"
 	"strings"
 )
@@ -586,6 +587,13 @@ func (m *MysqlRepository) InsertAggregates(name string, v reflect.Value, rootID 
 }
 
 func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, err error) {
+	profile, err := std.UseProfile(ctx)
+	if err != nil {
+		return 0, fmt.Errorf(`unable to get profile: %v`, err)
+	}
+
+	user := profile.UserUUID
+
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("INSERT INTO ")
@@ -593,7 +601,7 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate)")
 	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
 
-	err = setCreateFields("system", m.config, reflect.ValueOf(model))
+	err = setCreateFields(user, m.config, reflect.ValueOf(model))
 	if err != nil {
 		return 0, fmt.Errorf(`unable to set creaet fields: %v`, err)
 	}
@@ -613,7 +621,7 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.InsertAggregates("system", v.Elem().Field(i), int(id64))
+			err = m.InsertAggregates(user, v.Elem().Field(i), int(id64))
 			if err != nil {
 				return 0, fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -673,7 +681,14 @@ func (m *MysqlRepository) DeleteAggregates(name string, t reflect.Type, rootID i
 }
 
 func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
-	err := setUpdateFields("system", reflect.ValueOf(model))
+	profile, err := std.UseProfile(ctx)
+	if err != nil {
+		return fmt.Errorf(`unable to get profile: %v`, err)
+	}
+
+	user := profile.UserUUID
+
+	err = setUpdateFields(user, reflect.ValueOf(model))
 	if err != nil {
 		return fmt.Errorf(`unable to set create fields: %v`, err)
 	}
@@ -707,12 +722,12 @@ func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates("system", t.Field(i).Type.Elem(), rootID)
+			err = m.DeleteAggregates(user, t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
 
-			err = m.InsertAggregates("system", v.Elem().Field(i), rootID)
+			err = m.InsertAggregates(user, v.Elem().Field(i), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -745,6 +760,13 @@ func (m *MysqlRepository) GetRootIDByUUID(uuid string) (int, error) {
 }
 
 func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
+	profile, err := std.UseProfile(ctx)
+	if err != nil {
+		return fmt.Errorf(`unable to get profile: %v`, err)
+	}
+
+	user := profile.UserUUID
+
 	rootID, err := m.GetRootIDByUUID(uuid)
 	if err != nil {
 		return fmt.Errorf(`unable to get id: %v`, err)
@@ -752,12 +774,10 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 
 	var txtSQL strings.Builder
 
-	name := "system"
-
 	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET IsDeleted = true, UpdatedBy = ?, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = '" + uuid + "'")
 
-	res, err := m.db.Exec(txtSQL.String(), name)
+	res, err := m.db.Exec(txtSQL.String(), user)
 	if err != nil {
 		return fmt.Errorf("unable to update: %v", err)
 	}
@@ -775,7 +795,7 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates("system", t.Field(i).Type.Elem(), rootID)
+			err = m.DeleteAggregates(user, t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
