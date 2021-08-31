@@ -121,7 +121,7 @@ func setUpdateFieldsSlice(name string, v reflect.Value) error {
 type MysqlRepository struct {
 	t      reflect.Type
 	config RootModelConfig
-	db     *DB
+	db     *sqlx.DB
 	fields []string
 }
 
@@ -148,7 +148,7 @@ func validateDBModel(model interface{}) error {
 	return nil
 }
 
-func NewRepository(obj interface{}, db *DB) (Repository, error) {
+func NewRepository(obj interface{}, db *sqlx.DB) (Repository, error) {
 	t := reflect.TypeOf(obj)
 
 	config, err := getRootConfig(t)

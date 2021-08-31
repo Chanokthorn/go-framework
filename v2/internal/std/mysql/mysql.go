@@ -7,15 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type DB struct {
-	*sqlx.DB
-}
-
-type Tx struct {
-	*sqlx.Tx
-}
-
-func NewMysqlDB(connectionString string) (*DB, error) {
+func NewMysqlDB(connectionString string) (*sqlx.DB, error) {
 	db, err := sqlx.Connect("mysql", connectionString)
 
 	if err != nil {
@@ -31,5 +23,5 @@ func NewMysqlDB(connectionString string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{db}, nil
+	return db, nil
 }
