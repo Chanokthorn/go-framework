@@ -15,6 +15,10 @@ type Repository interface {
 	GetByUUIDs(ctx context.Context, dest interface{}, uuids []string) error
 	GetByID(ctx context.Context, dest interface{}, id int) error
 	GetByUUID(ctx context.Context, dest interface{}, uuid string) error
+	FillStructsByID(ctx context.Context, src interface{}) error
+	FillStructsByUUID(ctx context.Context, src interface{}) error
+	FillStructByID(ctx context.Context, src interface{}) error
+	FillStructByUUID(ctx context.Context, src interface{}) error
 	GetByRootID(ctx context.Context, dest interface{}, rootID int) error
 	GetAll(ctx context.Context, dest interface{}) error
 	Search(ctx context.Context, dest interface{}, model DBModel) error
@@ -345,6 +349,80 @@ func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid 
 	}
 
 	return nil
+}
+
+func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) error {
+	v := reflect.ValueOf(src)
+
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Slice {
+		return fmt.Errorf(`src must be pointer to slice`)
+	}
+
+	if reflect.TypeOf(src).Elem().Elem() != m.t {
+		fmt.Errorf(`invalid input type, must be %s`, m.t.String())
+	}
+
+	ids := []int{}
+	for i := 0; i < v.Elem().Len(); i++ {
+		ids = append(ids, int(v.Elem().Index(i).FieldByName(m.config.IDField).Elem().Int()))
+	}
+
+	var txtSQL strings.Builder
+
+	txtSQL.WriteString("SELECT ")
+	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(" FROM " + m.config.TableName)
+	txtSQL.WriteString(" WHERE " + m.config.IDField + " IN (" + generateIntSliceString(ids, "", ", ") + ") AND IsDeleted = false")
+	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.IDField + ", " + generateIntSliceString(ids, "", ", ") + ")")
+
+	ss := txtSQL.String()
+
+	println(ss)
+
+	items := reflect.New(reflect.SliceOf(m.t)).Interface()
+
+	err := m.db.Select(items, txtSQL.String())
+	if err != nil {
+		return fmt.Errorf(`unable to get all: %v`, err)
+	}
+
+	v.Elem().Set(reflect.ValueOf(items).Elem())
+
+	return nil
+}
+
+func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}) error {
+	panic("implement me")
+}
+
+func (m *MysqlRepository) FillStructByID(ctx context.Context, src interface{}) error {
+	v := reflect.ValueOf(src)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf(`src must be pointer to struct`)
+	}
+
+	if v.Elem().Type() != m.t {
+		return fmt.Errorf(`invalid input type, must be %s`, m.t.String())
+	}
+
+	id64 := v.Elem().FieldByName(m.config.IDField).Elem().Int()
+
+	return m.GetByID(ctx, src, int(id64))
+}
+
+func (m *MysqlRepository) FillStructByUUID(ctx context.Context, src interface{}) error {
+	v := reflect.ValueOf(src)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf(`src must be pointer to struct`)
+	}
+
+	if v.Elem().Type() != m.t {
+		return fmt.Errorf(`invalid input type, must be %s`, m.t.String())
+	}
+
+	uuid := v.Elem().FieldByName(m.config.UUIDField).Elem().String()
+
+	return m.GetByUUID(ctx, src, uuid)
 }
 
 func (m *MysqlRepository) GetByRootID(ctx context.Context, dest interface{}, rootID int) error {

@@ -1,6 +1,8 @@
 package duck
 
-import "context"
+import (
+	"context"
+)
 
 type Repository interface {
 	GetByIDs(ctx context.Context, ids []int) ([]Duck, error)
