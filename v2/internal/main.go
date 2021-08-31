@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/davecgh/go-spew/spew"
 	"reflect-test/v2/internal/duck"
 	"reflect-test/v2/internal/mysql"
@@ -134,19 +135,23 @@ func main() {
 	//spew.Dump(ds)
 
 	/// CREATE ///
-	//var d duck.Duck
-	//
-	//err = gofakeit.Struct(&d)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//id, err := duckService.Create(ctx, d)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//spew.Dump(id)
+	var d duck.Duck
+
+	err = gofakeit.Struct(&d)
+	if err != nil {
+		panic(err)
+	}
+
+	std.WithRelTxContext(ctx, func(ctx context.Context) error {
+		id, err := duckService.Create(ctx, d)
+		if err != nil {
+			panic(err)
+		}
+
+		spew.Dump(id)
+
+		return nil
+	})
 
 	/// UPDATE ///
 	//var d duck.Duck
@@ -165,11 +170,11 @@ func main() {
 	//}
 
 	/// DELETE ///
-	uuid := "4a7bdf09-6744-357f-a0d8-08705e23fe73"
-
-	err = duckService.Delete(ctx, uuid)
-	if err != nil {
-		panic(err)
-	}
+	//uuid := "4a7bdf09-6744-357f-a0d8-08705e23fe73"
+	//
+	//err = duckService.Delete(ctx, uuid)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 }

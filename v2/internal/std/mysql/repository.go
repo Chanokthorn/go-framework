@@ -2,6 +2,7 @@ package std_mysql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	uuid "github.com/satori/go.uuid"
@@ -69,6 +70,16 @@ func getFields(t reflect.Type) []string {
 	}
 
 	return fields
+}
+
+func hasAggregates(t reflect.Type) bool {
+	for i := 0; i < t.NumField(); i++ {
+		if implementsDBAggregateModelSlice(t.Field(i).Type) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func setCreateFields(name string, config RootModelConfig, v reflect.Value) error {
@@ -547,7 +558,7 @@ func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DB
 }
 
 // InsertAggregates does not support recursive insert in this implementation
-func (m *MysqlRepository) InsertAggregates(name string, v reflect.Value, rootID int) error {
+func (m *MysqlRepository) InsertAggregates(tx *sqlx.Tx, name string, v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 
 	fields, config, err := getAggregateFieldAndConfig(t)
@@ -571,7 +582,7 @@ func (m *MysqlRepository) InsertAggregates(name string, v reflect.Value, rootID 
 	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ", CreatedBy, CreatedDate)")
 	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
 
-	res, err := m.db.NamedExec(txtSQL.String(), v.Interface())
+	res, err := tx.NamedExec(txtSQL.String(), v.Interface())
 	if err != nil {
 		return fmt.Errorf(`unable to insert: %v`, err)
 	}
@@ -594,6 +605,17 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 
 	user := profile.UserUUID
 
+	useTx := hasAggregates(m.t)
+
+	var tx *sqlx.Tx
+
+	if useTx {
+		tx, err = std.UseMysqlTx(ctx)
+		if err != nil {
+			return 0, fmt.Errorf(`context must contain mysql tx: %v`, err)
+		}
+	}
+
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("INSERT INTO ")
@@ -606,9 +628,18 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 		return 0, fmt.Errorf(`unable to set creaet fields: %v`, err)
 	}
 
-	res, err := m.db.NamedExec(txtSQL.String(), model)
-	if err != nil {
-		return 0, fmt.Errorf(`unable to insert: %v`, err)
+	var res sql.Result
+
+	if useTx {
+		res, err = tx.NamedExec(txtSQL.String(), model)
+		if err != nil {
+			return 0, fmt.Errorf(`unable to insert: %v`, err)
+		}
+	} else {
+		res, err = m.db.NamedExec(txtSQL.String(), model)
+		if err != nil {
+			return 0, fmt.Errorf(`unable to insert: %v`, err)
+		}
 	}
 
 	id64, err := res.LastInsertId()
@@ -621,7 +652,7 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.InsertAggregates(user, v.Elem().Field(i), int(id64))
+			err = m.InsertAggregates(tx, user, v.Elem().Field(i), int(id64))
 			if err != nil {
 				return 0, fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -661,7 +692,7 @@ func (m *MysqlRepository) GetID(v reflect.Value) (int, error) {
 }
 
 // DeleteAggregates does not support recursive in this implementation
-func (m *MysqlRepository) DeleteAggregates(name string, t reflect.Type, rootID int) error {
+func (m *MysqlRepository) DeleteAggregates(tx *sqlx.Tx, name string, t reflect.Type, rootID int) error {
 	_, config, err := getAggregateFieldAndConfig(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get config and field: %v`, err)
@@ -672,7 +703,7 @@ func (m *MysqlRepository) DeleteAggregates(name string, t reflect.Type, rootID i
 	txtSQL.WriteString("UPDATE " + config.TableName + " SET IsDeleted = true, UpdatedBy = ?, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
 	txtSQL.WriteString(" WHERE " + config.RootIDField + " = " + strconv.Itoa(rootID))
 
-	_, err = m.db.Exec(txtSQL.String(), name)
+	_, err = tx.Exec(txtSQL.String(), name)
 	if err != nil {
 		return fmt.Errorf("unable to update: %v", err)
 	}
@@ -687,6 +718,17 @@ func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
 	}
 
 	user := profile.UserUUID
+
+	useTx := hasAggregates(m.t)
+
+	var tx *sqlx.Tx
+
+	if useTx {
+		tx, err = std.UseMysqlTx(ctx)
+		if err != nil {
+			return fmt.Errorf(`context must contain mysql tx: %v`, err)
+		}
+	}
 
 	err = setUpdateFields(user, reflect.ValueOf(model))
 	if err != nil {
@@ -710,9 +752,16 @@ func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
 
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = :" + m.config.UUIDField)
 
-	_, err = m.db.NamedExec(txtSQL.String(), model)
-	if err != nil {
-		return fmt.Errorf("unable to update: %v", err)
+	if useTx {
+		_, err = tx.NamedExec(txtSQL.String(), model)
+		if err != nil {
+			return fmt.Errorf("unable to update: %v", err)
+		}
+	} else {
+		_, err = m.db.NamedExec(txtSQL.String(), model)
+		if err != nil {
+			return fmt.Errorf("unable to update: %v", err)
+		}
 	}
 
 	rootID, err := m.GetID(v.Elem())
@@ -722,12 +771,12 @@ func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates(user, t.Field(i).Type.Elem(), rootID)
+			err = m.DeleteAggregates(tx, user, t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
 
-			err = m.InsertAggregates(user, v.Elem().Field(i), rootID)
+			err = m.InsertAggregates(tx, user, v.Elem().Field(i), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -767,6 +816,17 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 
 	user := profile.UserUUID
 
+	useTx := hasAggregates(m.t)
+
+	var tx *sqlx.Tx
+
+	if useTx {
+		tx, err = std.UseMysqlTx(ctx)
+		if err != nil {
+			return fmt.Errorf(`context must contain mysql tx: %v`, err)
+		}
+	}
+
 	rootID, err := m.GetRootIDByUUID(uuid)
 	if err != nil {
 		return fmt.Errorf(`unable to get id: %v`, err)
@@ -777,9 +837,18 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 	txtSQL.WriteString("UPDATE " + m.config.TableName + " SET IsDeleted = true, UpdatedBy = ?, UpdatedDate = ADDDATE(NOW(), INTERVAL 7 HOUR)")
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = '" + uuid + "'")
 
-	res, err := m.db.Exec(txtSQL.String(), user)
-	if err != nil {
-		return fmt.Errorf("unable to update: %v", err)
+	var res sql.Result
+
+	if useTx {
+		res, err = tx.Exec(txtSQL.String(), user)
+		if err != nil {
+			return fmt.Errorf("unable to update: %v", err)
+		}
+	} else {
+		res, err = m.db.Exec(txtSQL.String(), user)
+		if err != nil {
+			return fmt.Errorf("unable to update: %v", err)
+		}
 	}
 
 	rowsAffected, err := res.RowsAffected()
@@ -795,7 +864,7 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates(user, t.Field(i).Type.Elem(), rootID)
+			err = m.DeleteAggregates(tx, user, t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
