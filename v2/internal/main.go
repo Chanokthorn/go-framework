@@ -76,16 +76,16 @@ func main() {
 	//spew.Dump(d)
 
 	/// FILL STRUCTS BY ID ///
-	id1 := 28
-	id2 := 27
-	id3 := 29
-	ds := []model.Duck{{DuckID: &id1}, {DuckID: &id2}, {DuckID: &id3}}
-	err = duckDBRepository.FillStructsByID(ctx, &ds)
-	if err != nil {
-		panic(err)
-	}
-
-	spew.Dump(ds)
+	//id1 := 28
+	//id2 := 27
+	//id3 := 29
+	//ds := []model.Duck{{DuckID: &id1}, {DuckID: &id2}, {DuckID: &id3}}
+	//err = duckDBRepository.FillStructsByID(ctx, &ds)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(ds)
 
 	/// FILL STRUCTS BY ID ///
 	//uuid1 := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
@@ -108,12 +108,12 @@ func main() {
 	//spew.Dump(d)
 
 	/// GET BY UUID ///
-	//d, err := duckService.GetByUUID(ctx, "23123462-f076-3017-89d4-635be9b90d6f")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//spew.Dump(d)
+	d, err := duckService.GetByUUID(ctx, "23123462-f076-3017-89d4-635be9b90d6f")
+	if err != nil {
+		panic(err)
+	}
+
+	spew.Dump(d)
 
 	/// GET ALL ///
 	//ds, err := duckService.GetAll(ctx)
@@ -160,20 +160,27 @@ func main() {
 	//	panic(err)
 	//}
 	//
-	//uuid := "4a7bdf09-6744-357f-a0d8-08705e23fe73"
+	//uuid := "33c37a0c-2c7f-3862-89bf-63bacd2f499a"
 	//d.DuckUUID = &uuid
 	//
-	//err = duckService.Update(ctx, d)
-	//if err != nil {
-	//	panic(err)
-	//}
+	//std.WithRelTxContext(ctx, func(ctx context.Context) error {
+	//	err = duckService.Update(ctx, d)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//
+	//	return nil
+	//})
 
 	/// DELETE ///
-	//uuid := "4a7bdf09-6744-357f-a0d8-08705e23fe73"
+	//uuid := "33c37a0c-2c7f-3862-89bf-63bacd2f499a"
 	//
-	//err = duckService.Delete(ctx, uuid)
-	//if err != nil {
-	//	panic(err)
-	//}
-
+	//std.WithRelTxContext(ctx, func(ctx context.Context) error {
+	//	err = duckService.Delete(ctx, uuid)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//
+	//	return nil
+	//})
 }

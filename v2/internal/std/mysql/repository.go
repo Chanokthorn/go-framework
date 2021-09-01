@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jmoiron/sqlx"
 	uuid "github.com/satori/go.uuid"
 	"reflect"
@@ -57,14 +56,12 @@ func getFields(t reflect.Type) ([]string, error) {
 
 func fillFields(fields []string, t reflect.Type) []string {
 	dbCommonInterface := reflect.TypeOf((*DBCommon)(nil)).Elem()
-	spew.Dump(t)
 
 	if t.Kind() == reflect.Interface {
 		return fields
 	}
 
 	for i := 0; i < t.NumField(); i++ {
-		println(t.Field(i).Name)
 		if reflect.PtrTo(t.Field(i).Type).Implements(dbCommonInterface) {
 			fields = fillFields(fields, t.Field(i).Type)
 		}
@@ -234,7 +231,7 @@ func (m *MysqlRepository) getAggregates(v reflect.Value, rootID int) error {
 		return fmt.Errorf(`unable to get config: %v`, err)
 	}
 
-	fields, err := getFields(t)
+	selectFields, err := getSelectFields(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get fields: %v`, err)
 	}
@@ -242,7 +239,7 @@ func (m *MysqlRepository) getAggregates(v reflect.Value, rootID int) error {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(fields, ", ") + ", CreatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(selectFields, ", "))
 	txtSQL.WriteString(" FROM " + config.TableName)
 	txtSQL.WriteString(" WHERE " + config.RootIDField + " = ? AND IsDeleted = false")
 
@@ -280,14 +277,10 @@ func (m *MysqlRepository) GetByIDs(ctx context.Context, dest interface{}, ids []
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " IN (" + generateIntSliceString(ids, "", ", ") + ") AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.IDField + ", " + generateIntSliceString(ids, "", ", ") + ")")
-
-	ss := txtSQL.String()
-
-	println(ss)
 
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
 
@@ -311,7 +304,7 @@ func (m *MysqlRepository) GetByUUIDs(ctx context.Context, dest interface{}, uuid
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " IN ('" + strings.Join(uuids, "', '") + "') AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.UUIDField + ", '" + strings.Join(uuids, "', '") + "')")
@@ -338,7 +331,7 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
 
@@ -369,7 +362,7 @@ func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " = ? AND IsDeleted = false")
 
@@ -417,7 +410,7 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " IN (" + generateIntSliceString(ids, "", ", ") + ") AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.IDField + ", " + generateIntSliceString(ids, "", ", ") + ")")
@@ -453,7 +446,7 @@ func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.UUIDField + " IN ('" + strings.Join(uuids, "', '") + "') AND IsDeleted = false")
 	txtSQL.WriteString(" ORDER BY FIELD(" + m.config.UUIDField + ", '" + strings.Join(uuids, "', '") + "')")
@@ -508,7 +501,7 @@ func (m *MysqlRepository) GetByRootID(ctx context.Context, dest interface{}, roo
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.RootIDField + " = ? AND IsDeleted = false")
 
@@ -534,7 +527,7 @@ func (m *MysqlRepository) GetAll(ctx context.Context, dest interface{}) error {
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 
 	items := reflect.New(reflect.SliceOf(m.t)).Interface()
@@ -562,7 +555,7 @@ func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DB
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("SELECT ")
-	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
+	txtSQL.WriteString(strings.Join(m.selectFields, ", "))
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE IsDeleted = false")
 
