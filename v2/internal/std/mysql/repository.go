@@ -335,9 +335,6 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
 
-	ss := txtSQL.String()
-	println(ss)
-
 	err := m.db.Get(dest, txtSQL.String(), id)
 	if err != nil {
 		return fmt.Errorf(`unable to get: %v`, err)
@@ -402,6 +399,10 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 		fmt.Errorf(`invalid input type, must be %s`, m.t.String())
 	}
 
+	if v.Elem().Len() == 0 {
+		return nil
+	}
+
 	ids := []int{}
 	for i := 0; i < v.Elem().Len(); i++ {
 		ids = append(ids, int(v.Elem().Index(i).FieldByName(m.config.IDField).Elem().Int()))
@@ -436,6 +437,10 @@ func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}
 
 	if reflect.TypeOf(src).Elem().Elem() != m.t {
 		fmt.Errorf(`invalid input type, must be %s`, m.t.String())
+	}
+
+	if v.Elem().Len() == 0 {
+		return nil
 	}
 
 	uuids := []string{}
@@ -591,6 +596,10 @@ func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DB
 
 // InsertAggregates does not support recursive insert in this implementation
 func (m *MysqlRepository) InsertAggregates(tx *sqlx.Tx, name string, v reflect.Value, rootID int) error {
+	if v.Len() == 0 {
+		return nil
+	}
+
 	t := v.Type().Elem()
 
 	config, err := getAggregateConfig(t)
@@ -730,7 +739,6 @@ func (m *MysqlRepository) GetID(v reflect.Value) (int, error) {
 
 // DeleteAggregates does not support recursive in this implementation
 func (m *MysqlRepository) DeleteAggregates(tx *sqlx.Tx, name string, t reflect.Type, rootID int) error {
-
 	config, err := getAggregateConfig(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get config: %v`, err)
