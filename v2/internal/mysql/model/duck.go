@@ -6,7 +6,7 @@ import (
 )
 
 type Duck struct {
-	stdMysql.DBRootCommon
+	stdMysql.RootCommon
 	DuckID   *int    `db:"DuckID"`
 	DuckUUID *string `db:"DuckUUID"`
 	Name     *string `db:"Name"`
@@ -14,8 +14,8 @@ type Duck struct {
 	Eggs     []Egg
 }
 
-func (d *Duck) GetConfig() stdMysql.RootModelConfig {
-	return stdMysql.RootModelConfig{
+func (d *Duck) GetConfig() stdMysql.RootConfig {
+	return stdMysql.RootConfig{
 		TableName: "duck",
 		IDField:   "DuckID",
 		UUIDField: "DuckUUID",
@@ -57,15 +57,15 @@ func (d *Duck) ToModel() duck.Duck {
 }
 
 type Egg struct {
-	stdMysql.DBAggregateCommon
+	stdMysql.AggregateCommon
 	EggID  *int    `db:"EggID"`
 	DuckID *int    `db:"DuckID"`
 	Name   *string `db:"Name"`
 	Age    *int    `db:"Age"`
 }
 
-func (e *Egg) GetConfig() stdMysql.AggregateModelConfig {
-	return stdMysql.AggregateModelConfig{
+func (e *Egg) GetConfig() stdMysql.AggregateConfig {
+	return stdMysql.AggregateConfig{
 		TableName:   "egg",
 		IDField:     "EggID",
 		RootIDField: "DuckID",

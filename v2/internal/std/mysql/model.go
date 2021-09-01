@@ -4,52 +4,97 @@ import (
 	"time"
 )
 
-type DBCommon interface {
-	dbCommon()
+type dbModel interface {
+	dbModelFunc()
 }
 
-type DBRootCommon struct {
-	DBCommon
-	DBRootModel
-	CreatedBy   *string    `db:"CreatedBy"`
-	CreatedDate *time.Time `db:"CreatedDate"`
-	UpdatedBy   *string    `db:"UpdatedBy"`
-	UpdatedDate *time.Time `db:"UpdatedDate"`
-	IsDeleted   *bool      `db:"IsDeleted"`
+// RootModel represent root model that the repository stores, the model must implement this interface
+// by embedding RootCommon and has GetConfig() that returns RootConfig
+// for example:
+//	type Duck struct {
+//		stdMysql.RootCommon
+//		DuckID   *int    `db:"DuckID"`
+//		DuckUUID *string `db:"DuckUUID"`
+//		Name     *string `db:"Name"`
+//		Color    *string `db:"Color"`
+//		Eggs     []Egg
+//	}
+//
+//	func (d *Duck) GetConfig() stdMysql.RootConfig {
+//		return stdMysql.RootConfig{
+//			TableName: "duck",
+//			IDField:   "DuckID",
+//			UUIDField: "DuckUUID",
+//		}
+//	}
+type RootModel interface {
+	dbModel
+	GetConfig() RootConfig
 }
 
-type DBAggregateCommon struct {
-	DBCommon
-	DBAggregateModel
-	CreatedBy   *string    `db:"CreatedBy"`
-	CreatedDate *time.Time `db:"CreatedDate"`
-	UpdatedBy   *string    `db:"UpdatedBy"`
-	UpdatedDate *time.Time `db:"UpdatedDate"`
-	IsDeleted   *bool      `db:"IsDeleted"`
+// AggregateModel represent aggregate model that the root model contains, the model must implement this interface
+// by embedding AggregateCommon and has GetConfig() that returns AggregateConfig
+// for example:
+//	type Egg struct {
+//		stdMysql.AggregateCommon
+//		EggID  *int    `db:"EggID"`
+//		DuckID *int    `db:"DuckID"`
+//		Name   *string `db:"Name"`
+//		Age    *int    `db:"Age"`
+//	}
+//
+//	func (e *Egg) GetConfig() stdMysql.AggregateConfig {
+//		return stdMysql.AggregateConfig{
+//			TableName:   "egg",
+//			IDField:     "EggID",
+//			RootIDField: "DuckID",
+//		}
+//	}
+type AggregateModel interface {
+	dbModel
+	GetConfig() AggregateConfig
 }
 
-type RootModelConfig struct {
+// RootConfig contains property of root model IDField, UUIDField, RootIDField must be the same name for both DB column
+// name and struct field name. RootIDField is optional in case the Root model contains ID of another Root
+type RootConfig struct {
 	TableName   string
 	IDField     string
 	UUIDField   string
 	RootIDField string
 }
 
-type AggregateModelConfig struct {
+// AggregateConfig contains property of aggregate model IDField, RootIDField must be the same name for both DB column
+// name and struct field name. All fields are required.
+type AggregateConfig struct {
 	TableName   string
 	IDField     string
 	RootIDField string
 }
 
-type DBModel interface {
+type dbCommon interface {
+	dbCommonFunc()
 }
 
-type DBRootModel interface {
-	DBModel
-	GetConfig() RootModelConfig
+// RootCommon contains basic MySQL fields and implements RootModel. Can be embedded by struct to represent Root model.
+type RootCommon struct {
+	dbCommon
+	RootModel
+	CreatedBy   *string    `db:"CreatedBy"`
+	CreatedDate *time.Time `db:"CreatedDate"`
+	UpdatedBy   *string    `db:"UpdatedBy"`
+	UpdatedDate *time.Time `db:"UpdatedDate"`
+	IsDeleted   *bool      `db:"IsDeleted"`
 }
 
-type DBAggregateModel interface {
-	DBModel
-	GetConfig() AggregateModelConfig
+// AggregateCommon contains basic MySQL fields and implements AggregateCommon. Can be embedded by struct to
+//	represent Aggregate model.
+type AggregateCommon struct {
+	dbCommon
+	AggregateModel
+	CreatedBy   *string    `db:"CreatedBy"`
+	CreatedDate *time.Time `db:"CreatedDate"`
+	UpdatedBy   *string    `db:"UpdatedBy"`
+	UpdatedDate *time.Time `db:"UpdatedDate"`
+	IsDeleted   *bool      `db:"IsDeleted"`
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/davecgh/go-spew/spew"
 	"reflect-test/v2/internal/duck"
 	"reflect-test/v2/internal/mysql"
@@ -36,6 +37,7 @@ func main() {
 	ctx = std.SetProfile(ctx, std.Profile{std.UserPermission{UserUUID: "1212312121"}})
 	println(duckDBRepository, duckRepository, duckService)
 	spew.Dump()
+	gofakeit.New(1)
 
 	/// GET BY ID SLICE ///
 	//ds, err := duckRepository.GetByIDs(ctx, []int{28, 27, 29})
@@ -108,12 +110,12 @@ func main() {
 	//spew.Dump(d)
 
 	/// GET BY UUID ///
-	d, err := duckService.GetByUUID(ctx, "23123462-f076-3017-89d4-635be9b90d6f")
-	if err != nil {
-		panic(err)
-	}
-
-	spew.Dump(d)
+	//d, err := duckService.GetByUUID(ctx, "1d51839e-b417-3680-9897-a7a3f0e008f9")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//spew.Dump(d)
 
 	/// GET ALL ///
 	//ds, err := duckService.GetAll(ctx)
@@ -134,23 +136,23 @@ func main() {
 	//spew.Dump(ds)
 
 	/// CREATE ///
-	//var d duck.Duck
-	//
-	//err = gofakeit.Struct(&d)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//std.WithRelTxContext(ctx, func(ctx context.Context) error {
-	//	id, err := duckService.Create(ctx, d)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//
-	//	spew.Dump(id)
-	//
-	//	return nil
-	//})
+	var d duck.Duck
+
+	err = gofakeit.Struct(&d)
+	if err != nil {
+		panic(err)
+	}
+
+	std.WithRelTxContext(ctx, func(ctx context.Context) error {
+		id, err := duckService.Create(ctx, d)
+		if err != nil {
+			panic(err)
+		}
+
+		spew.Dump(id)
+
+		return nil
+	})
 
 	/// UPDATE ///
 	//var d duck.Duck

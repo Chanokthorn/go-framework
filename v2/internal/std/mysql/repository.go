@@ -1,3 +1,9 @@
+// Manages basic model storage on MySQL with user and transaction integration.
+// Requirements:
+// 1. Insert/Update/Delete operations on model with aggregates require ctx to contain
+// 		MySQL transaction set by std.WithRelDocTxContext or std.WithRelTxContext
+// 2. The repository requires Root model, if root model contains one-to-many relationship it must contain
+// 		a slice of struct that implements AggregateModel
 package std_mysql
 
 import (
@@ -23,18 +29,18 @@ type Repository interface {
 	FillStructByUUID(ctx context.Context, src interface{}) error
 	GetByRootID(ctx context.Context, dest interface{}, rootID int) error
 	GetAll(ctx context.Context, dest interface{}) error
-	Search(ctx context.Context, dest interface{}, model DBModel) error
-	Insert(ctx context.Context, model DBModel) (id int, err error)
-	Update(ctx context.Context, model DBModel) error
+	Search(ctx context.Context, dest interface{}, model dbModel) error
+	Insert(ctx context.Context, model dbModel) (id int, err error)
+	Update(ctx context.Context, model dbModel) error
 	Delete(ctx context.Context, uuid string) error
 }
 
-func getRootConfig(t reflect.Type) (RootModelConfig, error) {
-	return reflect.New(t).Interface().(DBRootModel).GetConfig(), nil
+func getRootConfig(t reflect.Type) (RootConfig, error) {
+	return reflect.New(t).Interface().(RootModel).GetConfig(), nil
 }
 
-func getAggregateConfig(t reflect.Type) (AggregateModelConfig, error) {
-	return reflect.New(t).Interface().(DBAggregateModel).GetConfig(), nil
+func getAggregateConfig(t reflect.Type) (AggregateConfig, error) {
+	return reflect.New(t).Interface().(AggregateModel).GetConfig(), nil
 }
 
 func getFields(t reflect.Type) ([]string, error) {
@@ -55,7 +61,7 @@ func getFields(t reflect.Type) ([]string, error) {
 }
 
 func fillFields(fields []string, t reflect.Type) []string {
-	dbCommonInterface := reflect.TypeOf((*DBCommon)(nil)).Elem()
+	dbCommonInterface := reflect.TypeOf((*dbCommon)(nil)).Elem()
 
 	if t.Kind() == reflect.Interface {
 		return fields
@@ -99,7 +105,7 @@ func hasAggregates(t reflect.Type) bool {
 	return false
 }
 
-func setCreateFields(name string, config RootModelConfig, v reflect.Value) error {
+func setCreateFields(name string, config RootConfig, v reflect.Value) error {
 	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf(`value must be pointer`)
 	}
@@ -149,7 +155,7 @@ func setUpdateFieldsSlice(name string, v reflect.Value) error {
 
 type MysqlRepository struct {
 	t            reflect.Type
-	config       RootModelConfig
+	config       RootConfig
 	db           *sqlx.DB
 	fields       []string
 	selectFields []string
@@ -162,7 +168,7 @@ func validateDBModel(model interface{}) error {
 		return fmt.Errorf(`invalid model config: %v`, err)
 	}
 
-	common := reflect.TypeOf(DBRootCommon{})
+	common := reflect.TypeOf(RootCommon{})
 
 	foundCommon := false
 	for i := 0; i < t.NumField(); i++ {
@@ -172,7 +178,7 @@ func validateDBModel(model interface{}) error {
 	}
 
 	if !foundCommon {
-		return fmt.Errorf(`model must contain std.DBRootCommon`)
+		return fmt.Errorf(`model must contain std.RootCommon`)
 	}
 
 	return nil
@@ -200,7 +206,7 @@ func NewRepository(obj interface{}, db *sqlx.DB) (Repository, error) {
 }
 
 func isAggregate(field interface{}) bool {
-	inter := reflect.TypeOf((*DBAggregateModel)(nil)).Elem()
+	inter := reflect.TypeOf((*AggregateModel)(nil)).Elem()
 
 	if reflect.TypeOf(field).Implements(inter) {
 		return true
@@ -210,7 +216,7 @@ func isAggregate(field interface{}) bool {
 }
 
 func implementsDBAggregateModel(t reflect.Type) bool {
-	inter := reflect.TypeOf((*DBAggregateModel)(nil)).Elem()
+	inter := reflect.TypeOf((*AggregateModel)(nil)).Elem()
 
 	return reflect.PtrTo(t.Elem()).Implements(inter)
 }
@@ -273,6 +279,13 @@ func generateIntSliceString(intSlice []int, prefix string, delim string) string 
 	return txt.String()
 }
 
+// GetByIDs selects multiple models based on given IDs while preserving their orders. Writes them to destination
+// for example:
+//	ds := []model.Duck{}
+//	err := dr.Repository.GetByIDs(ctx, &ds, []int{28, 27, 29})
+//	if err != nil {
+//		return nil, fmt.Errorf(`unable to get by ids %v`, err)
+//	}
 func (m *MysqlRepository) GetByIDs(ctx context.Context, dest interface{}, ids []int) error {
 	var txtSQL strings.Builder
 
@@ -300,6 +313,13 @@ func (m *MysqlRepository) GetByIDs(ctx context.Context, dest interface{}, ids []
 	return nil
 }
 
+// GetByUUIDs selects multiple models based on given UUIDs while preserving their orders. Writes them to destination
+// for example:
+//	ds := []model.Duck{}
+//	err := dr.Repository.GetByUUIDs(ctx, &ds, []string{"dbb90ee9-8d45-340c-8f28-9496a7f3aefe", ...})
+//	if err != nil {
+//		return nil, fmt.Errorf(`unable to get by uuids %v`, err)
+//	}
 func (m *MysqlRepository) GetByUUIDs(ctx context.Context, dest interface{}, uuids []string) error {
 	var txtSQL strings.Builder
 
@@ -327,6 +347,13 @@ func (m *MysqlRepository) GetByUUIDs(ctx context.Context, dest interface{}, uuid
 	return nil
 }
 
+// GetByID selects single model and its aggregates based on given ID
+// for example:
+//	var d model.Duck
+//	err := dr.Repository.GetByID(ctx, &d, 27)
+//	if err != nil {
+//		return duck.Duck{}, fmt.Errorf(`unable to get by id: %v`, err)
+//	}
 func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int) error {
 	var txtSQL strings.Builder
 
@@ -355,6 +382,13 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 	return nil
 }
 
+// GetByUUID selects single model and its aggregates based on given UUID
+// for example:
+//	var d model.Duck
+//	err := dr.Repository.GetByUUID(ctx, &d, "dbb90ee9-8d45-340c-8f28-9496a7f3aefe")
+//	if err != nil {
+//		return duck.Duck{}, fmt.Errorf(`unable to get by uuid: %v`, err)
+//	}
 func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid string) error {
 	var txtSQL strings.Builder
 
@@ -388,6 +422,16 @@ func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid 
 	return nil
 }
 
+// FillStructsByID populates slice of model using each model's ID field
+// for example:
+//	id1 := 28
+//	id2 := 27
+//	id3 := 29
+//	ds := []model.Duck{{DuckID: &id1}, {DuckID: &id2}, {DuckID: &id3}}
+//	err = duckRepository.FillStructsByID(ctx, &ds)
+//	if err != nil {
+//		panic(err)
+//	}
 func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) error {
 	v := reflect.ValueOf(src)
 
@@ -428,6 +472,16 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 	return nil
 }
 
+// FillStructsByUUID populates slice of model using each model's UUID field
+// for example:
+//	uuid1 := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
+//	uuid2 := "35698f21-32dd-37a6-8828-a483dec40c13"
+//	uuid3 := "23123462-f076-3017-89d4-635be9b90d6f"
+//	ds := []model.Duck{{DuckUUID: &uuid1}, {DuckUUID: &uuid2}, {DuckUUID: &uuid3}}
+//	err = duckDBRepository.FillStructsByUUID(ctx, &ds)
+//	if err != nil {
+//		panic(err)
+//	}
 func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}) error {
 	v := reflect.ValueOf(src)
 
@@ -468,6 +522,15 @@ func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}
 	return nil
 }
 
+// FillStructByID populates a model using its ID field
+// for example:
+//	var d model.Duck
+//	id := 27
+//	d.DuckID = &id
+//	err = duckDBRepository.FillStructByID(ctx, &d)
+//	if err != nil {
+//		panic(err)
+//	}
 func (m *MysqlRepository) FillStructByID(ctx context.Context, src interface{}) error {
 	v := reflect.ValueOf(src)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
@@ -483,6 +546,15 @@ func (m *MysqlRepository) FillStructByID(ctx context.Context, src interface{}) e
 	return m.GetByID(ctx, src, int(id64))
 }
 
+// FillStructByUUID populates a model using its UUID field
+// for example:
+//	var d model.Duck
+//	id := 27
+//	d.DuckID = &id
+//	err = duckDBRepository.FillStructByID(ctx, &d)
+//	if err != nil {
+//		panic(err)
+//	}
 func (m *MysqlRepository) FillStructByUUID(ctx context.Context, src interface{}) error {
 	v := reflect.ValueOf(src)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
@@ -498,6 +570,7 @@ func (m *MysqlRepository) FillStructByUUID(ctx context.Context, src interface{})
 	return m.GetByUUID(ctx, src, uuid)
 }
 
+// GetByRootID selects multiple items by their root/parent's id
 func (m *MysqlRepository) GetByRootID(ctx context.Context, dest interface{}, rootID int) error {
 	if m.config.RootIDField == "" {
 		return fmt.Errorf(`the type does not have root id field`)
@@ -528,6 +601,13 @@ func (m *MysqlRepository) GetByRootID(ctx context.Context, dest interface{}, roo
 	return nil
 }
 
+// GetAll selects all rows of the model and set them on given destination
+// for example:
+//	var ds []model.Duck
+//	err := dr.Repository.GetAll(ctx, &ds)
+//	if err != nil {
+//		return nil, fmt.Errorf(`unable to get all: %v`, err)
+//	}
 func (m *MysqlRepository) GetAll(ctx context.Context, dest interface{}) error {
 	var txtSQL strings.Builder
 
@@ -553,7 +633,16 @@ func (m *MysqlRepository) GetAll(ctx context.Context, dest interface{}) error {
 	return nil
 }
 
-func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DBModel) error {
+// Search selects rows that matches the given model where each field is optional, sets the result to given destionation
+// for example:
+//	var ds []model.Duck
+//	color := "white"
+//	d := model.Duck{Color: &color}
+//	err := dr.Repository.Search(ctx, &ds, d)
+//	if err != nil {
+//		return nil, fmt.Errorf(`unable to search: %v`, err)
+//	}
+func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model dbModel) error {
 	v := reflect.ValueOf(model)
 	t := reflect.TypeOf(model).Elem()
 
@@ -594,8 +683,8 @@ func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DB
 	return nil
 }
 
-// InsertAggregates does not support recursive insert in this implementation
-func (m *MysqlRepository) InsertAggregates(tx *sqlx.Tx, name string, v reflect.Value, rootID int) error {
+// insertAggregates does not support recursive insert in this implementation
+func (m *MysqlRepository) insertAggregates(tx *sqlx.Tx, name string, v reflect.Value, rootID int) error {
 	if v.Len() == 0 {
 		return nil
 	}
@@ -643,7 +732,14 @@ func (m *MysqlRepository) InsertAggregates(tx *sqlx.Tx, name string, v reflect.V
 	return nil
 }
 
-func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, err error) {
+// Insert inserts item and its aggregates into db
+// for example:
+//	d := model.Duck{}
+//	id, err = dr.Repository.Insert(ctx, d)
+//	if err != nil {
+//		return 0, fmt.Errorf(`unable to insert: %v`, err)
+//	}
+func (m *MysqlRepository) Insert(ctx context.Context, model dbModel) (id int, err error) {
 	profile, err := std.UseProfile(ctx)
 	if err != nil {
 		return 0, fmt.Errorf(`unable to get profile: %v`, err)
@@ -698,7 +794,7 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.InsertAggregates(tx, user, v.Elem().Field(i), int(id64))
+			err = m.insertAggregates(tx, user, v.Elem().Field(i), int(id64))
 			if err != nil {
 				return 0, fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -708,7 +804,7 @@ func (m *MysqlRepository) Insert(ctx context.Context, model DBModel) (id int, er
 	return int(id64), nil
 }
 
-func (m *MysqlRepository) GetID(v reflect.Value) (int, error) {
+func (m *MysqlRepository) getID(v reflect.Value) (int, error) {
 	t := v.Type()
 
 	config, err := getRootConfig(t)
@@ -737,8 +833,8 @@ func (m *MysqlRepository) GetID(v reflect.Value) (int, error) {
 	return id, nil
 }
 
-// DeleteAggregates does not support recursive in this implementation
-func (m *MysqlRepository) DeleteAggregates(tx *sqlx.Tx, name string, t reflect.Type, rootID int) error {
+// deleteAggregates does not support recursive in this implementation
+func (m *MysqlRepository) deleteAggregates(tx *sqlx.Tx, name string, t reflect.Type, rootID int) error {
 	config, err := getAggregateConfig(t)
 	if err != nil {
 		return fmt.Errorf(`unable to get config: %v`, err)
@@ -757,7 +853,14 @@ func (m *MysqlRepository) DeleteAggregates(tx *sqlx.Tx, name string, t reflect.T
 	return nil
 }
 
-func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
+// Update updates item and its aggregates
+// for example:
+//	d := model.Duck{}
+//	err := dr.Repository.Update(ctx, d)
+//	if err != nil {
+//		return fmt.Errorf(`unable to update: %v`, err)
+//	}
+func (m *MysqlRepository) Update(ctx context.Context, model dbModel) error {
 	profile, err := std.UseProfile(ctx)
 	if err != nil {
 		return fmt.Errorf(`unable to get profile: %v`, err)
@@ -810,19 +913,19 @@ func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
 		}
 	}
 
-	rootID, err := m.GetID(v.Elem())
+	rootID, err := m.getID(v.Elem())
 	if err != nil {
 		return fmt.Errorf("unable to get root id: %v", err)
 	}
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates(tx, user, t.Field(i).Type.Elem(), rootID)
+			err = m.deleteAggregates(tx, user, t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
 
-			err = m.InsertAggregates(tx, user, v.Elem().Field(i), rootID)
+			err = m.insertAggregates(tx, user, v.Elem().Field(i), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
@@ -832,7 +935,7 @@ func (m *MysqlRepository) Update(ctx context.Context, model DBModel) error {
 	return nil
 }
 
-func (m *MysqlRepository) GetRootIDByUUID(uuid string) (int, error) {
+func (m *MysqlRepository) getRootIDByUUID(uuid string) (int, error) {
 	config, err := getRootConfig(m.t)
 	if err != nil {
 		return 0, fmt.Errorf(`unable to get type config: %v`, err)
@@ -854,6 +957,13 @@ func (m *MysqlRepository) GetRootIDByUUID(uuid string) (int, error) {
 	return id, nil
 }
 
+// Delete soft-deletes item and its aggregates
+// for example:
+//  uuid := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
+//	err = duckService.Delete(ctx, uuid)
+//	if err != nil {
+//		panic(err)
+//	}
 func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 	profile, err := std.UseProfile(ctx)
 	if err != nil {
@@ -873,7 +983,7 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 		}
 	}
 
-	rootID, err := m.GetRootIDByUUID(uuid)
+	rootID, err := m.getRootIDByUUID(uuid)
 	if err != nil {
 		return fmt.Errorf(`unable to get id: %v`, err)
 	}
@@ -910,7 +1020,7 @@ func (m *MysqlRepository) Delete(ctx context.Context, uuid string) error {
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.DeleteAggregates(tx, user, t.Field(i).Type.Elem(), rootID)
+			err = m.deleteAggregates(tx, user, t.Field(i).Type.Elem(), rootID)
 			if err != nil {
 				return fmt.Errorf(`unable to delete aggregates: %v`, err)
 			}
