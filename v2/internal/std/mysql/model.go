@@ -4,7 +4,12 @@ import (
 	"time"
 )
 
+type DBCommon interface {
+	dbCommon()
+}
+
 type DBRootCommon struct {
+	DBCommon
 	DBRootModel
 	CreatedBy   *string    `db:"CreatedBy"`
 	CreatedDate *time.Time `db:"CreatedDate"`
@@ -14,6 +19,7 @@ type DBRootCommon struct {
 }
 
 type DBAggregateCommon struct {
+	DBCommon
 	DBAggregateModel
 	CreatedBy   *string    `db:"CreatedBy"`
 	CreatedDate *time.Time `db:"CreatedDate"`

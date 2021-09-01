@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jmoiron/sqlx"
 	uuid "github.com/satori/go.uuid"
 	"reflect"
@@ -54,13 +55,19 @@ func getFields(t reflect.Type) ([]string, error) {
 	return fields, nil
 }
 
-func getSelectFields(t reflect.Type) ([]string, error) {
+func fillFields(fields []string, t reflect.Type) []string {
+	dbCommonInterface := reflect.TypeOf((*DBCommon)(nil)).Elem()
+	spew.Dump(t)
 
-	fields := []string{}
-
-	// TODO: implement recursive find
+	if t.Kind() == reflect.Interface {
+		return fields
+	}
 
 	for i := 0; i < t.NumField(); i++ {
+		println(t.Field(i).Name)
+		if reflect.PtrTo(t.Field(i).Type).Implements(dbCommonInterface) {
+			fields = fillFields(fields, t.Field(i).Type)
+		}
 		if field := t.Field(i).Tag.Get("db"); field != "" {
 			if t.Field(i).Type.Elem().Kind() == reflect.Bool {
 				fields = append(fields, fmt.Sprintf(`%s = b'1' %s`, field, field))
@@ -69,6 +76,14 @@ func getSelectFields(t reflect.Type) ([]string, error) {
 			}
 		}
 	}
+
+	return fields
+}
+
+func getSelectFields(t reflect.Type) ([]string, error) {
+	fields := []string{}
+
+	fields = fillFields(fields, t)
 
 	if len(fields) == 0 {
 		return nil, fmt.Errorf(`struct must have at least one field`)
