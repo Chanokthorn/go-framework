@@ -37,29 +37,7 @@ func getAggregateConfig(t reflect.Type) (AggregateModelConfig, error) {
 	return reflect.New(t).Interface().(DBAggregateModel).GetConfig(), nil
 }
 
-func getRootFieldAndConfig(t reflect.Type) ([]string, RootModelConfig, error) {
-	config, err := getRootConfig(t)
-	if err != nil {
-		return nil, RootModelConfig{}, fmt.Errorf(`unable to get type config: %v`, err)
-	}
-
-	fields := getFields(t)
-
-	return fields, config, nil
-}
-
-func getAggregateFieldAndConfig(t reflect.Type) ([]string, AggregateModelConfig, error) {
-	config, err := getAggregateConfig(t)
-	if err != nil {
-		return nil, AggregateModelConfig{}, fmt.Errorf(`unable to get type config: %v`, err)
-	}
-
-	fields := getFields(t)
-
-	return fields, config, nil
-}
-
-func getFields(t reflect.Type) []string {
+func getFields(t reflect.Type) ([]string, error) {
 
 	fields := []string{}
 
@@ -69,7 +47,34 @@ func getFields(t reflect.Type) []string {
 		}
 	}
 
-	return fields
+	if len(fields) == 0 {
+		return nil, fmt.Errorf(`struct must have at least one field`)
+	}
+
+	return fields, nil
+}
+
+func getSelectFields(t reflect.Type) ([]string, error) {
+
+	fields := []string{}
+
+	// TODO: implement recursive find
+
+	for i := 0; i < t.NumField(); i++ {
+		if field := t.Field(i).Tag.Get("db"); field != "" {
+			if t.Field(i).Type.Elem().Kind() == reflect.Bool {
+				fields = append(fields, fmt.Sprintf(`%s = b'1' %s`, field, field))
+			} else {
+				fields = append(fields, field)
+			}
+		}
+	}
+
+	if len(fields) == 0 {
+		return nil, fmt.Errorf(`struct must have at least one field`)
+	}
+
+	return fields, nil
 }
 
 func hasAggregates(t reflect.Type) bool {
@@ -131,10 +136,11 @@ func setUpdateFieldsSlice(name string, v reflect.Value) error {
 }
 
 type MysqlRepository struct {
-	t      reflect.Type
-	config RootModelConfig
-	db     *sqlx.DB
-	fields []string
+	t            reflect.Type
+	config       RootModelConfig
+	db           *sqlx.DB
+	fields       []string
+	selectFields []string
 }
 
 func validateDBModel(model interface{}) error {
@@ -165,10 +171,20 @@ func NewRepository(obj interface{}, db *sqlx.DB) (Repository, error) {
 
 	config, err := getRootConfig(t)
 	if err != nil {
-		return nil, fmt.Errorf(`unable to get std config: %v`, err)
+		return nil, fmt.Errorf(`unable to get config: %v`, err)
 	}
 
-	return &MysqlRepository{t: t, config: config, db: db, fields: getFields(t)}, nil
+	fields, err := getFields(t)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to get fields: %v`, err)
+	}
+
+	selectFields, err := getSelectFields(t)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to get select fields: %v`, err)
+	}
+
+	return &MysqlRepository{t: t, config: config, db: db, fields: fields, selectFields: selectFields}, nil
 }
 
 func isAggregate(field interface{}) bool {
@@ -198,9 +214,14 @@ func implementsDBAggregateModelSlice(t reflect.Type) bool {
 func (m *MysqlRepository) getAggregates(v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 
-	fields, config, err := getAggregateFieldAndConfig(t)
+	config, err := getAggregateConfig(t)
 	if err != nil {
-		return fmt.Errorf(`unable to get config and field: %v`, err)
+		return fmt.Errorf(`unable to get config: %v`, err)
+	}
+
+	fields, err := getFields(t)
+	if err != nil {
+		return fmt.Errorf(`unable to get fields: %v`, err)
 	}
 
 	var txtSQL strings.Builder
@@ -305,6 +326,9 @@ func (m *MysqlRepository) GetByID(ctx context.Context, dest interface{}, id int)
 	txtSQL.WriteString(strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate, UpdatedBy, UpdatedDate")
 	txtSQL.WriteString(" FROM " + m.config.TableName)
 	txtSQL.WriteString(" WHERE " + m.config.IDField + " = ? AND IsDeleted = false")
+
+	ss := txtSQL.String()
+	println(ss)
 
 	err := m.db.Get(dest, txtSQL.String(), id)
 	if err != nil {
@@ -561,9 +585,14 @@ func (m *MysqlRepository) Search(ctx context.Context, dest interface{}, model DB
 func (m *MysqlRepository) InsertAggregates(tx *sqlx.Tx, name string, v reflect.Value, rootID int) error {
 	t := v.Type().Elem()
 
-	fields, config, err := getAggregateFieldAndConfig(t)
+	config, err := getAggregateConfig(t)
 	if err != nil {
-		return fmt.Errorf(`unable to get config and field: %v`, err)
+		return fmt.Errorf(`unable to get config: %v`, err)
+	}
+
+	fields, err := getFields(t)
+	if err != nil {
+		return fmt.Errorf(`unable to get fields: %v`, err)
 	}
 
 	for i := 0; i < v.Len(); i++ {
@@ -693,9 +722,10 @@ func (m *MysqlRepository) GetID(v reflect.Value) (int, error) {
 
 // DeleteAggregates does not support recursive in this implementation
 func (m *MysqlRepository) DeleteAggregates(tx *sqlx.Tx, name string, t reflect.Type, rootID int) error {
-	_, config, err := getAggregateFieldAndConfig(t)
+
+	config, err := getAggregateConfig(t)
 	if err != nil {
-		return fmt.Errorf(`unable to get config and field: %v`, err)
+		return fmt.Errorf(`unable to get config: %v`, err)
 	}
 
 	var txtSQL strings.Builder
