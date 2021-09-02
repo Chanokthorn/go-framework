@@ -12,7 +12,7 @@ type dbModel interface {
 // by embedding RootCommon and has GetConfig() that returns RootConfig
 // for example:
 //	type Duck struct {
-//		stdMysql.RootCommon
+//		std_mysql.RootCommon
 //		DuckID   *int    `db:"DuckID"`
 //		DuckUUID *string `db:"DuckUUID"`
 //		Name     *string `db:"Name"`
@@ -21,7 +21,7 @@ type dbModel interface {
 //	}
 //
 //	func (d *Duck) GetConfig() stdMysql.RootConfig {
-//		return stdMysql.RootConfig{
+//		return std_mysql.RootConfig{
 //			TableName: "duck",
 //			IDField:   "DuckID",
 //			UUIDField: "DuckUUID",
@@ -36,7 +36,7 @@ type RootModel interface {
 // by embedding AggregateCommon and has GetConfig() that returns AggregateConfig
 // for example:
 //	type Egg struct {
-//		stdMysql.AggregateCommon
+//		std_mysql.AggregateCommon
 //		EggID  *int    `db:"EggID"`
 //		DuckID *int    `db:"DuckID"`
 //		Name   *string `db:"Name"`
@@ -44,7 +44,7 @@ type RootModel interface {
 //	}
 //
 //	func (e *Egg) GetConfig() stdMysql.AggregateConfig {
-//		return stdMysql.AggregateConfig{
+//		return std_mysql.AggregateConfig{
 //			TableName:   "egg",
 //			IDField:     "EggID",
 //			RootIDField: "DuckID",

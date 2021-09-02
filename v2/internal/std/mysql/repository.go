@@ -282,7 +282,7 @@ func generateIntSliceString(intSlice []int, prefix string, delim string) string 
 // GetByIDs selects multiple models based on given IDs while preserving their orders. Writes them to destination
 // for example:
 //	ds := []model.Duck{}
-//	err := dr.Repository.GetByIDs(ctx, &ds, []int{28, 27, 29})
+//	err := repository.GetByIDs(ctx, &ds, []int{28, 27, 29})
 //	if err != nil {
 //		return nil, fmt.Errorf(`unable to get by ids %v`, err)
 //	}
@@ -316,7 +316,7 @@ func (m *MysqlRepository) GetByIDs(ctx context.Context, dest interface{}, ids []
 // GetByUUIDs selects multiple models based on given UUIDs while preserving their orders. Writes them to destination
 // for example:
 //	ds := []model.Duck{}
-//	err := dr.Repository.GetByUUIDs(ctx, &ds, []string{"dbb90ee9-8d45-340c-8f28-9496a7f3aefe", ...})
+//	err := repository.GetByUUIDs(ctx, &ds, []string{"dbb90ee9-8d45-340c-8f28-9496a7f3aefe", ...})
 //	if err != nil {
 //		return nil, fmt.Errorf(`unable to get by uuids %v`, err)
 //	}
@@ -350,7 +350,7 @@ func (m *MysqlRepository) GetByUUIDs(ctx context.Context, dest interface{}, uuid
 // GetByID selects single model and its aggregates based on given ID
 // for example:
 //	var d model.Duck
-//	err := dr.Repository.GetByID(ctx, &d, 27)
+//	err := repository.GetByID(ctx, &d, 27)
 //	if err != nil {
 //		return duck.Duck{}, fmt.Errorf(`unable to get by id: %v`, err)
 //	}
@@ -428,7 +428,7 @@ func (m *MysqlRepository) GetByUUID(ctx context.Context, dest interface{}, uuid 
 //	id2 := 27
 //	id3 := 29
 //	ds := []model.Duck{{DuckID: &id1}, {DuckID: &id2}, {DuckID: &id3}}
-//	err = duckRepository.FillStructsByID(ctx, &ds)
+//	err = repository.FillStructsByID(ctx, &ds)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -478,7 +478,7 @@ func (m *MysqlRepository) FillStructsByID(ctx context.Context, src interface{}) 
 //	uuid2 := "35698f21-32dd-37a6-8828-a483dec40c13"
 //	uuid3 := "23123462-f076-3017-89d4-635be9b90d6f"
 //	ds := []model.Duck{{DuckUUID: &uuid1}, {DuckUUID: &uuid2}, {DuckUUID: &uuid3}}
-//	err = duckDBRepository.FillStructsByUUID(ctx, &ds)
+//	err = repository.FillStructsByUUID(ctx, &ds)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -527,7 +527,7 @@ func (m *MysqlRepository) FillStructsByUUID(ctx context.Context, src interface{}
 //	var d model.Duck
 //	id := 27
 //	d.DuckID = &id
-//	err = duckDBRepository.FillStructByID(ctx, &d)
+//	err = repository.FillStructByID(ctx, &d)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -551,7 +551,7 @@ func (m *MysqlRepository) FillStructByID(ctx context.Context, src interface{}) e
 //	var d model.Duck
 //	id := 27
 //	d.DuckID = &id
-//	err = duckDBRepository.FillStructByID(ctx, &d)
+//	err = repository.FillStructByID(ctx, &d)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -604,7 +604,7 @@ func (m *MysqlRepository) GetByRootID(ctx context.Context, dest interface{}, roo
 // GetAll selects all rows of the model and set them on given destination
 // for example:
 //	var ds []model.Duck
-//	err := dr.Repository.GetAll(ctx, &ds)
+//	err := repository.GetAll(ctx, &ds)
 //	if err != nil {
 //		return nil, fmt.Errorf(`unable to get all: %v`, err)
 //	}
@@ -638,7 +638,7 @@ func (m *MysqlRepository) GetAll(ctx context.Context, dest interface{}) error {
 //	var ds []model.Duck
 //	color := "white"
 //	d := model.Duck{Color: &color}
-//	err := dr.Repository.Search(ctx, &ds, d)
+//	err := repository.Search(ctx, &ds, d)
 //	if err != nil {
 //		return nil, fmt.Errorf(`unable to search: %v`, err)
 //	}
@@ -735,7 +735,7 @@ func (m *MysqlRepository) insertAggregates(tx *sqlx.Tx, name string, v reflect.V
 // Insert inserts item and its aggregates into db
 // for example:
 //	d := model.Duck{}
-//	id, err = dr.Repository.Insert(ctx, d)
+//	id, err = repository.Insert(ctx, d)
 //	if err != nil {
 //		return 0, fmt.Errorf(`unable to insert: %v`, err)
 //	}
@@ -856,7 +856,7 @@ func (m *MysqlRepository) deleteAggregates(tx *sqlx.Tx, name string, t reflect.T
 // Update updates item and its aggregates
 // for example:
 //	d := model.Duck{}
-//	err := dr.Repository.Update(ctx, d)
+//	err := repository.Update(ctx, d)
 //	if err != nil {
 //		return fmt.Errorf(`unable to update: %v`, err)
 //	}
@@ -960,7 +960,7 @@ func (m *MysqlRepository) getRootIDByUUID(uuid string) (int, error) {
 // Delete soft-deletes item and its aggregates
 // for example:
 //  uuid := "dbb90ee9-8d45-340c-8f28-9496a7f3aefe"
-//	err = duckService.Delete(ctx, uuid)
+//	err = repository.Delete(ctx, uuid)
 //	if err != nil {
 //		panic(err)
 //	}
