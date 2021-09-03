@@ -10,6 +10,7 @@ import (
 	"reflect-test/v3/internal/lib/user"
 	"reflect-test/v3/internal/mysql"
 	"reflect-test/v3/internal/mysql/model"
+	"reflect-test/v3/internal/pond"
 )
 
 func main() {
@@ -21,6 +22,11 @@ func main() {
 	}
 
 	std.SetTxProvider(db, nil)
+
+	pondRepository, err := std_mysql.NewRepository(pond.Pond{}, db)
+	if err != nil {
+		panic(err)
+	}
 
 	duckDBRepository, err := std_mysql.NewRepository(model.Duck{}, db)
 	if err != nil {
@@ -144,31 +150,31 @@ func main() {
 	//spew.Dump(ds)
 
 	/// CREATE ///
-	var d duck.Duck
-
-	err = gofakeit.Struct(&d)
-	if err != nil {
-		panic(err)
-	}
-
-	std.WithProfile(ctx, profile, func(ctx context.Context) error {
-		err = std.WithRelTxContext(ctx, func(ctx context.Context) error {
-			id, err := duckService.Create(ctx, d)
-			if err != nil {
-				panic(err)
-			}
-
-			spew.Dump(id)
-
-			return nil
-		})
-
-		if err != nil {
-			panic(err)
-		}
-
-		return nil
-	})
+	//var d duck.Duck
+	//
+	//err = gofakeit.Struct(&d)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//std.WithProfile(ctx, profile, func(ctx context.Context) error {
+	//	err = std.WithRelTxContext(ctx, func(ctx context.Context) error {
+	//		id, err := duckService.Create(ctx, d)
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//
+	//		spew.Dump(id)
+	//
+	//		return nil
+	//	})
+	//
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//
+	//	return nil
+	//})
 
 	/// UPDATE ///
 	//var d duck.Duck
@@ -201,4 +207,32 @@ func main() {
 	//
 	//	return nil
 	//})
+
+	///////////// POND //////////////
+	var p pond.Pond
+
+	err = gofakeit.Struct(&p)
+	if err != nil {
+		panic(err)
+	}
+
+	std.WithProfile(ctx, profile, func(ctx context.Context) error {
+		err = std.WithRelTxContext(ctx, func(ctx context.Context) error {
+			id, err := pondRepository.Insert(ctx, &p)
+			if err != nil {
+				panic(err)
+			}
+
+			spew.Dump(id)
+
+			return nil
+		})
+
+		if err != nil {
+			panic(err)
+		}
+
+		return nil
+	})
+
 }
