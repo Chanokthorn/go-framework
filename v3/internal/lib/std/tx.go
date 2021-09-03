@@ -3,6 +3,7 @@ package std
 import (
 	"context"
 	"fmt"
+
 	"github.com/jmoiron/sqlx"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -20,9 +21,9 @@ var (
 	mongoClient *mongo.Client
 )
 
-// SetTxProvider sets global std_mysql db, mongo client, etc. for later usage. Must be set on application starting up
+// SetTxProvider sets global mysql db, mongo client, etc. for later usage. Must be set on application starting up
 // for example:
-//	db, err := std_mysql.NewDB(config.MySQL)
+//	db, err := mysql.NewDB(config.MySQL)
 //	if err != nil {
 //		log.Fatalf("Error on opening database connection: %s", err.Error())
 //	}

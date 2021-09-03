@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	"reflect-test/v2/internal/duck"
-	"reflect-test/v2/internal/mysql/model"
-	stdMysql "reflect-test/v2/internal/std_mysql"
+	"reflect-test/v3/internal/duck"
+	stdMysql "reflect-test/v3/internal/lib/mysql"
+	"reflect-test/v3/internal/mysql/model"
 )
 
 type duckRepository struct {
@@ -112,12 +112,12 @@ func (dr *duckRepository) Search(ctx context.Context, dReq duck.Duck) ([]duck.Du
 }
 
 func (dr *duckRepository) Create(ctx context.Context, dReq duck.Duck) (id int, err error) {
-	id, err = dr.Repository.Insert(ctx, model.NewDuck(dReq))
+	res, err := dr.Repository.Insert(ctx, model.NewDuck(dReq))
 	if err != nil {
 		return 0, fmt.Errorf(`unable to insert: %v`, err)
 	}
 
-	return id, nil
+	return res.ID, nil
 }
 
 func (dr *duckRepository) Update(ctx context.Context, dReq duck.Duck) error {

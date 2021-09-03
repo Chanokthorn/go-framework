@@ -4,11 +4,12 @@ import (
 	"context"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/davecgh/go-spew/spew"
-	"reflect-test/v2/internal/duck"
-	"reflect-test/v2/internal/mysql"
-	"reflect-test/v2/internal/mysql/model"
-	"reflect-test/v2/internal/std"
-	"reflect-test/v2/internal/std/std_mysql"
+	"reflect-test/v3/internal/duck"
+	std_mysql "reflect-test/v3/internal/lib/mysql"
+	"reflect-test/v3/internal/lib/std"
+	"reflect-test/v3/internal/lib/user"
+	"reflect-test/v3/internal/mysql"
+	"reflect-test/v3/internal/mysql/model"
 )
 
 func main() {
@@ -34,18 +35,25 @@ func main() {
 	duckService := duck.NewService(duckRepository)
 
 	ctx := context.TODO()
-	ctx = std.SetProfile(ctx, std.Profile{std.UserPermission{UserUUID: "1212312121"}})
 	println(duckDBRepository, duckRepository, duckService)
 	spew.Dump()
 	gofakeit.New(1)
+	profile := std.Profile{user.UserPermission{UserUUID: "1212312121"}}
 
 	/// GET BY ID SLICE ///
-	//ds, err := duckRepository.GetByIDs(ctx, []int{28, 27, 29})
+	//err = std.WithProfile(ctx, profile, func(ctx context.Context) error {
+	//	ds, err := duckRepository.GetByIDs(ctx, []int{28, 27, 29})
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	spew.Dump(ds)
+	//	return nil
+	//})
+	//
 	//if err != nil {
 	//	panic(err)
 	//}
-	//
-	//spew.Dump(ds)
 
 	/// GET BY UUID SLICE ///
 	//ds, err := duckRepository.GetByUUIDs(ctx, []string{"dbb90ee9-8d45-340c-8f28-9496a7f3aefe", "35698f21-32dd-37a6-8828-a483dec40c13", "23123462-f076-3017-89d4-635be9b90d6f"})
@@ -143,13 +151,21 @@ func main() {
 		panic(err)
 	}
 
-	std.WithRelTxContext(ctx, func(ctx context.Context) error {
-		id, err := duckService.Create(ctx, d)
+	std.WithProfile(ctx, profile, func(ctx context.Context) error {
+		err = std.WithRelTxContext(ctx, func(ctx context.Context) error {
+			id, err := duckService.Create(ctx, d)
+			if err != nil {
+				panic(err)
+			}
+
+			spew.Dump(id)
+
+			return nil
+		})
+
 		if err != nil {
 			panic(err)
 		}
-
-		spew.Dump(id)
 
 		return nil
 	})

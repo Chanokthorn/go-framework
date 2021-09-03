@@ -5,8 +5,11 @@ go 1.16
 require (
 	github.com/brianvoe/gofakeit/v6 v6.7.1
 	github.com/davecgh/go-spew v1.1.1
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/jmoiron/sqlx v1.3.4
+	github.com/labstack/echo/v4 v4.5.0 // indirect
+	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/satori/go.uuid v1.2.0
 	go.mongodb.org/mongo-driver v1.7.1
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect

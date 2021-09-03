@@ -1,4 +1,4 @@
-package mysql
+package std_mysql
 
 import (
 	"time"
@@ -7,15 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type DB struct {
-	*sqlx.DB
-}
-
-type Tx struct {
-	*sqlx.Tx
-}
-
-func NewDB(connectionString string) (*DB, error) {
+func NewMysqlDB(connectionString string) (*sqlx.DB, error) {
 	db, err := sqlx.Connect("std_mysql", connectionString)
 
 	if err != nil {
@@ -31,5 +23,5 @@ func NewDB(connectionString string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{db}, nil
+	return db, nil
 }

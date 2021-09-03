@@ -13,7 +13,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	uuid "github.com/satori/go.uuid"
 	"reflect"
-	"reflect-test/v2/internal/std"
+	"reflect-test/v3/internal/lib/std"
 	"strconv"
 	"strings"
 )
@@ -30,7 +30,7 @@ type Repository interface {
 	GetByRootID(ctx context.Context, dest interface{}, rootID int) error
 	GetAll(ctx context.Context, dest interface{}) error
 	Search(ctx context.Context, dest interface{}, model dbModel) error
-	Insert(ctx context.Context, model dbModel) (id int, err error)
+	Insert(ctx context.Context, model dbModel) (InsertResult, error)
 	Update(ctx context.Context, model dbModel) error
 	Delete(ctx context.Context, uuid string) error
 }
@@ -90,6 +90,39 @@ func getSelectFields(t reflect.Type) ([]string, error) {
 
 	if len(fields) == 0 {
 		return nil, fmt.Errorf(`struct must have at least one field`)
+	}
+
+	return fields, nil
+}
+
+func getNonNilFields(v reflect.Value) ([]string, error) {
+	if (v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct) && v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf(`value must be pointer to struct or struct`)
+	}
+
+	var t reflect.Type
+
+	if v.Kind() == reflect.Struct {
+		t = reflect.TypeOf(v.Interface())
+	} else {
+		t = reflect.TypeOf(v.Elem().Interface())
+	}
+
+	fields := []string{}
+
+	for i := 0; i < t.NumField(); i++ {
+		if field := t.Field(i).Tag.Get("db"); field != "" {
+			if v.Kind() == reflect.Struct {
+				if !v.Field(i).IsNil() {
+					fields = append(fields, field)
+				}
+			} else {
+				if !v.Elem().Field(i).IsNil() {
+					fields = append(fields, field)
+				}
+			}
+
+		}
 	}
 
 	return fields, nil
@@ -696,10 +729,10 @@ func (m *MysqlRepository) insertAggregates(tx *sqlx.Tx, name string, v reflect.V
 		return fmt.Errorf(`unable to get config: %v`, err)
 	}
 
-	fields, err := getFields(t)
-	if err != nil {
-		return fmt.Errorf(`unable to get fields: %v`, err)
-	}
+	//fields, err := getFields(t)
+	//if err != nil {
+	//	return fmt.Errorf(`unable to get fields: %v`, err)
+	//}
 
 	for i := 0; i < v.Len(); i++ {
 		v.Index(i).FieldByName(config.RootIDField).Set(reflect.ValueOf(&rootID))
@@ -708,6 +741,11 @@ func (m *MysqlRepository) insertAggregates(tx *sqlx.Tx, name string, v reflect.V
 	err = setCreateFieldsSlice(name, v)
 	if err != nil {
 		return fmt.Errorf(`unable to set create fields: %v`, err)
+	}
+
+	fields, err := getNonNilFields(v.Index(0))
+	if err != nil {
+		return fmt.Errorf(`unable to get non-nil fields: %v`, err)
 	}
 
 	var txtSQL strings.Builder
@@ -739,10 +777,10 @@ func (m *MysqlRepository) insertAggregates(tx *sqlx.Tx, name string, v reflect.V
 //	if err != nil {
 //		return 0, fmt.Errorf(`unable to insert: %v`, err)
 //	}
-func (m *MysqlRepository) Insert(ctx context.Context, model dbModel) (id int, err error) {
+func (m *MysqlRepository) Insert(ctx context.Context, model dbModel) (InsertResult, error) {
 	profile, err := std.UseProfile(ctx)
 	if err != nil {
-		return 0, fmt.Errorf(`unable to get profile: %v`, err)
+		return InsertResult{}, fmt.Errorf(`unable to get profile: %v`, err)
 	}
 
 	user := profile.UserUUID
@@ -754,54 +792,65 @@ func (m *MysqlRepository) Insert(ctx context.Context, model dbModel) (id int, er
 	if useTx {
 		tx, err = std.UseMysqlTx(ctx)
 		if err != nil {
-			return 0, fmt.Errorf(`context must contain mysql tx: %v`, err)
+			return InsertResult{}, fmt.Errorf(`context must contain mysql tx: %v`, err)
 		}
+	}
+
+	err = setCreateFields(user, m.config, reflect.ValueOf(model))
+	if err != nil {
+		return InsertResult{}, fmt.Errorf(`unable to set create fields: %v`, err)
+	}
+
+	fields, err := getNonNilFields(reflect.ValueOf(model))
+	if err != nil {
+		return InsertResult{}, fmt.Errorf(`unable to get non-nil fields: %v`, err)
 	}
 
 	var txtSQL strings.Builder
 
 	txtSQL.WriteString("INSERT INTO ")
 	txtSQL.WriteString(m.config.TableName)
-	txtSQL.WriteString("(" + strings.Join(m.fields, ", ") + ", CreatedBy, CreatedDate)")
-	txtSQL.WriteString(" VALUES (:" + strings.Join(m.fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
-
-	err = setCreateFields(user, m.config, reflect.ValueOf(model))
-	if err != nil {
-		return 0, fmt.Errorf(`unable to set creaet fields: %v`, err)
-	}
+	txtSQL.WriteString("(" + strings.Join(fields, ", ") + ", CreatedBy, CreatedDate)")
+	txtSQL.WriteString(" VALUES (:" + strings.Join(fields, ", :") + ", :CreatedBy, ADDDATE(NOW(), INTERVAL 7 HOUR))")
 
 	var res sql.Result
 
 	if useTx {
 		res, err = tx.NamedExec(txtSQL.String(), model)
 		if err != nil {
-			return 0, fmt.Errorf(`unable to insert: %v`, err)
+			return InsertResult{}, fmt.Errorf(`unable to insert: %v`, err)
 		}
 	} else {
 		res, err = m.db.NamedExec(txtSQL.String(), model)
 		if err != nil {
-			return 0, fmt.Errorf(`unable to insert: %v`, err)
+			return InsertResult{}, fmt.Errorf(`unable to insert: %v`, err)
 		}
 	}
 
 	id64, err := res.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf(`unable to get inserted id: %v`, err)
+		return InsertResult{}, fmt.Errorf(`unable to get inserted id: %v`, err)
 	}
+
+	id := int(id64)
 
 	v := reflect.ValueOf(model)
 	t := reflect.TypeOf(model).Elem()
 
 	for i := 0; i < t.NumField(); i++ {
 		if implementsDBAggregateModelSlice(t.Field(i).Type) {
-			err = m.insertAggregates(tx, user, v.Elem().Field(i), int(id64))
+			err = m.insertAggregates(tx, user, v.Elem().Field(i), id)
 			if err != nil {
-				return 0, fmt.Errorf(`unable to insert aggregates: %v`, err)
+				return InsertResult{}, fmt.Errorf(`unable to insert aggregates: %v`, err)
 			}
 		}
 	}
 
-	return int(id64), nil
+	v.Elem().FieldByName(m.config.IDField).Set(reflect.ValueOf(&id))
+
+	modelUUID := reflect.ValueOf(model).Elem().FieldByName(m.config.UUIDField).Elem().String()
+
+	return InsertResult{ID: id, UUID: modelUUID}, nil
 }
 
 func (m *MysqlRepository) getID(v reflect.Value) (int, error) {

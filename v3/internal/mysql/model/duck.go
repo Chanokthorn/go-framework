@@ -1,8 +1,8 @@
 package model
 
 import (
-	"reflect-test/v2/internal/duck"
-	stdMysql "reflect-test/v2/internal/std/std_mysql"
+	"reflect-test/v3/internal/duck"
+	stdMysql "reflect-test/v3/internal/lib/mysql"
 )
 
 type Duck struct {
